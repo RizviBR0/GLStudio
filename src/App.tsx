@@ -365,7 +365,7 @@ export default function App() {
                 </div>
             </aside>
 
-            <main className="main-workspace">
+            <main className={`main-workspace ${workspace.layout.terminal ? '' : 'terminal-hidden'}`}>
                 <div className="workspace-toolbar"><div className="workspace-name"><Code2 size={14} /><span>C++ workspace</span></div><div className="run-controls"><button className="example-button" onClick={() => setDialog('examples')}><BookOpen size={14} /><span>Examples</span></button><span className="toolbar-separator" />{(active || compiling) && <IconButton label="Stop execution" onClick={stop}><Square size={14} /></IconButton>}<RaisedButton size="sm" color="#0b70df" className="run-button" onClick={() => void run()} disabled={compiling || healthLoading || !health?.available} title={health?.available ? 'Compile and run (Ctrl+Enter)' : health?.message}>{compiling ? <LoaderCircle size={14} className="spin" /> : <Play size={14} />}<span>{compiling ? 'Compiling…' : 'Run code'}</span><kbd>Ctrl ↵</kbd></RaisedButton></div></div>
                 <div className="mobile-switch"><button className={mobileView === 'editor' ? 'active' : ''} onClick={() => { setMobileView('editor'); updateLayout({ mode: 'split' }); }}><Code2 size={14} />Editor</button><button className={mobileView === 'output' ? 'active' : ''} onClick={() => { setMobileView('output'); updateLayout({ mode: 'split' }); }}><Monitor size={14} />Output</button></div>
                 <div className={`working-area layout-${workspace.layout.mode}`} ref={workspaceArea} style={{ '--editor-width': `${workspace.layout.split}%` } as CSSProperties}>

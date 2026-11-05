@@ -608,6 +608,9 @@ svg {
   overflow: hidden;
   padding: 8px 10px 0;
 }
+.main-workspace.terminal-hidden .working-area {
+  padding-bottom: 10px;
+}
 .editor-panel {
   width: var(--editor-width);
   min-width: 0;
@@ -725,6 +728,7 @@ svg {
   flex: 1;
   min-height: 0;
   position: relative;
+  padding-left: 12px;
 }
 .editor-loading {
   display: flex;
@@ -1746,6 +1750,9 @@ svg {
   }
   .working-area {
     padding: 5px 5px 0;
+  }
+  .main-workspace.terminal-hidden .working-area {
+    padding-bottom: 5px;
   }
   .editor-panel,
   .output-panel {
