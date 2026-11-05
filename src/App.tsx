@@ -1,5 +1,5 @@
 import { lazy, Suspense, useCallback, useEffect, useId, useRef, useState, type CSSProperties, type ReactNode } from 'react';
-import { ArrowDownToLine, ArrowRight, BookOpen, Check, ChevronDown, ChevronRight, ChevronsLeftRight, Circle, CircleAlert, CircleCheck, CircleHelp, CircleX, Code2, Command, Copy, Download, Ellipsis, Expand, FileCode2, FilePlus2, Files, Folder, FolderOpen, Keyboard, LayoutPanelLeft, LoaderCircle, Maximize2, Monitor, Moon, PanelBottom, PanelLeftClose, PanelLeftOpen, Pause, Pencil, Play, Plus, RotateCcw, Search, Settings2, Sparkles, Square, Sun, Terminal, Trash2, Upload, X } from 'lucide-react';
+import { ArrowDownToLine, ArrowRight, BookOpen, Check, ChevronDown, ChevronRight, ChevronsLeftRight, Circle, CircleAlert, CircleCheck, CircleHelp, CircleX, Code2, Command, Copy, Download, Ellipsis, Expand, FileCode2, FilePlus2, Files, Folder, Keyboard, LayoutPanelLeft, LoaderCircle, Maximize2, Monitor, Moon, PanelBottom, PanelLeftClose, PanelLeftOpen, Pause, Pencil, Play, Plus, RotateCcw, Search, Settings2, Square, Sun, Terminal, Trash2, Upload, X } from 'lucide-react';
 import type { BuildArtifact, CompilerHealth, Diagnostic, RuntimeLog, RuntimeMetrics, RuntimeStatus, RuntimeStdin, SourceFile } from '../shared/contracts';
 import { checkCompiler, compileProject } from './compiler-client';
 import { Viewport, type ViewportHandle } from './Viewport';
@@ -286,7 +286,7 @@ export default function App() {
             if (collapsedFolders.has(path)) hidden = true;
         }
         if (!hidden) fileEntries.push(<div key={file.path} className={`tree-file ${file.path === workspace.activeFile ? 'selected' : ''}`}>
-            <button style={{ paddingLeft: 27 + (parts.length - 1) * 12 }} className="tree-file-main" onClick={() => { openFile(file.path); setMobileView('editor'); }} title={file.path}><span className="cpp-file-icon">C<span>++</span></span><span>{parts[parts.length - 1]}</span></button>
+            <button style={{ paddingLeft: 16 + (parts.length - 1) * 12 }} className="tree-file-main" onClick={() => { openFile(file.path); setMobileView('editor'); }} title={file.path}><span className="cpp-file-icon">C<span>++</span></span><span>{parts[parts.length - 1]}</span></button>
             <IconButton label={`Rename or delete ${file.path}`} onClick={() => openFileDialog(file.path)}><Ellipsis size={15} /></IconButton>
         </div>);
     }
@@ -295,7 +295,7 @@ export default function App() {
 
     return <div className={`studio-app ${workspace.layout.sidebar ? '' : 'sidebar-hidden'} mobile-${mobileView}`}>
         <header className="titlebar">
-            <a className="brand" href="#" onClick={event => event.preventDefault()} aria-label="GL Studio home"><span className="brand-symbol"><ChevronsLeftRight size={22} strokeWidth={2.5} /></span><span>GL<span className="brand-light"> Studio</span></span><span className="preview-badge">PREVIEW</span></a>
+            <a className="brand" href="#" onClick={event => event.preventDefault()} aria-label="GLStudio home"><span className="brand-symbol"><ChevronsLeftRight size={21} strokeWidth={2} /></span><span>GL<span className="brand-light">Studio</span></span></a>
             <div className="main-menu" ref={menuRef}>
                 <div className="menu-anchor"><button className={`text-button ${menu === 'project' ? 'selected' : ''}`} onClick={() => setMenu(menu === 'project' ? null : 'project')} aria-expanded={menu === 'project'}>Project<ChevronDown size={11} /></button>{menu === 'project' && <div className="dropdown"><button onClick={() => openFileDialog()}><FilePlus2 size={15} />New file</button><button onClick={() => { setDialog('examples'); setMenu(null); }}><BookOpen size={15} />Open example</button><div className="menu-divider" /><button onClick={exportProject}><Download size={15} />Export project<span>Ctrl S</span></button><button onClick={() => { importInput.current?.click(); setMenu(null); }}><Upload size={15} />Import project</button></div>}</div>
                 <div className="menu-anchor"><button className={`text-button ${menu === 'view' ? 'selected' : ''}`} onClick={() => setMenu(menu === 'view' ? null : 'view')} aria-expanded={menu === 'view'}>View<ChevronDown size={11} /></button>{menu === 'view' && <div className="dropdown"><button onClick={() => { updateLayout({ mode: 'split' }); setMenu(null); }}><LayoutPanelLeft size={15} />Split workspace</button><button onClick={() => { updateLayout({ mode: 'editor' }); setMobileView('editor'); setMenu(null); }}><Code2 size={15} />Editor only</button><button onClick={() => { updateLayout({ mode: 'output' }); setMobileView('output'); setMenu(null); }}><Monitor size={15} />Output only</button><div className="menu-divider" /><button onClick={() => { updateLayout({ ...defaultLayout }); setMenu(null); }}><RotateCcw size={15} />Reset layout</button><button onClick={() => { setDialog('settings'); setMenu(null); }}><Settings2 size={15} />Settings</button></div>}</div>
@@ -307,16 +307,16 @@ export default function App() {
         <div className="app-body">
             <nav className="activity-bar" aria-label="Workspace tools">
                 <div><IconButton label="Explorer (Ctrl+B)" active={workspace.layout.sidebar} onClick={() => updateLayout({ sidebar: !workspace.layout.sidebar })}><Files size={21} strokeWidth={1.6} /></IconButton><IconButton label="Find in editor" onClick={() => { setSearchToken(previous => previous + 1); setMobileView('editor'); updateLayout({ mode: 'split' }); }}><Search size={21} strokeWidth={1.6} /></IconButton><IconButton label="Example projects" active={dialog === 'examples'} onClick={() => setDialog('examples')}><BookOpen size={21} strokeWidth={1.6} /></IconButton><IconButton label="Build output" active={workspace.layout.terminal} onClick={() => { updateLayout({ terminal: !workspace.layout.terminal }); setTerminalTab('output'); }}><Terminal size={21} strokeWidth={1.6} /></IconButton></div>
-                <div><IconButton label="Compatibility and keyboard shortcuts" onClick={() => setDialog('help')}><CircleHelp size={20} strokeWidth={1.6} /></IconButton><IconButton label="Settings" onClick={() => setDialog('settings')}><Settings2 size={21} strokeWidth={1.6} /></IconButton><div className="profile-mark" title="Local workspace">L</div></div>
+                <div><IconButton label="Compatibility and keyboard shortcuts" onClick={() => setDialog('help')}><CircleHelp size={20} strokeWidth={1.6} /></IconButton><IconButton label="Settings" onClick={() => setDialog('settings')}><Settings2 size={21} strokeWidth={1.6} /></IconButton></div>
             </nav>
             <aside className="sidebar" aria-label="File explorer">
-                <div className="sidebar-heading"><span>EXPLORER</span><div><IconButton label="New file" onClick={() => openFileDialog()}><FilePlus2 size={15} /></IconButton><IconButton label="Hide sidebar" onClick={() => updateLayout({ sidebar: false })}><PanelLeftClose size={15} /></IconButton></div></div>
-                <div className="project-title"><ChevronDown size={13} /><FolderOpen size={15} /><span title={workspace.name}>{workspace.name}</span><span className="file-count">{workspace.files.length}</span></div>
+                <div className="sidebar-heading"><span>Files</span><div><IconButton label="New file" onClick={() => openFileDialog()}><FilePlus2 size={15} /></IconButton><IconButton label="Hide sidebar" onClick={() => updateLayout({ sidebar: false })}><PanelLeftClose size={15} /></IconButton></div></div>
                 <div className="file-tree">{fileEntries}</div>
                 <button className="add-file" onClick={() => openFileDialog()}><Plus size={13} />New file</button>
                 <div className="sidebar-bottom">
-                    <div className="learn-card"><span className="learn-icon"><Sparkles size={16} /></span><h3>A good place to start</h3><p>Explore the ideas behind the pixels, one example at a time.</p><button onClick={() => setDialog('examples')}>Browse examples<ArrowRight size={14} /></button></div>
-                    <button className="compatibility-link" onClick={() => setDialog('help')}><CircleHelp size={14} /><span>What can I run here?</span><ChevronRight size={13} /></button>
+                    <button className="sidebar-resource" onClick={() => setDialog('examples')}><BookOpen size={15} /><span>Explore examples</span><ArrowRight size={13} /></button>
+                    <button className="sidebar-resource" onClick={() => setDialog('help')}><CircleHelp size={15} /><span>Help & shortcuts</span><ChevronRight size={13} /></button>
+                    <div className="sidebar-environment"><span className="small-dot" />C++17<span>OpenGL / GLUT</span></div>
                 </div>
             </aside>
 
