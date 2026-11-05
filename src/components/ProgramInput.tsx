@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { CornerDownLeft } from 'lucide-react';
+import { RiCornerDownLeftLine as CornerDownLeft } from '@remixicon/react';
 import type { RuntimeStdin } from '../../shared/contracts';
 
 interface Props {

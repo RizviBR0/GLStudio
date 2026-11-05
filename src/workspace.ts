@@ -6,7 +6,7 @@ export interface StudioSettings { theme: Theme; fontSize: number; minimap: boole
 export interface StudioLayout { sidebar: boolean; terminal: boolean; split: number; panelHeight: number; mode: 'split' | 'editor' | 'output' }
 export interface Workspace { version: 1; name: string; files: SourceFile[]; activeFile: string; openFiles: string[]; settings: StudioSettings; layout: StudioLayout; updatedAt: number }
 export const STORAGE_KEY = 'glstudio.workspace.v1';
-export const defaultSettings: StudioSettings = { theme: 'dark', fontSize: 13, minimap: false, wordWrap: false, tabSize: 4 };
+export const defaultSettings: StudioSettings = { theme: 'dark', fontSize: 14, minimap: false, wordWrap: false, tabSize: 4 };
 export const defaultLayout: StudioLayout = { sidebar: true, terminal: true, split: 55, panelHeight: 190, mode: 'split' };
 export const defaultWorkspace = (): Workspace => ({ version: 1, name: 'Hello, triangle', files: examples[0].files.map(file => ({ ...file })), activeFile: 'main.cpp', openFiles: ['main.cpp'], settings: { ...defaultSettings }, layout: { ...defaultLayout }, updatedAt: Date.now() });
 
@@ -41,7 +41,7 @@ export function parseWorkspace(value: unknown): Workspace {
         name: typeof data.name === 'string' ? data.name.slice(0, 80) : 'Untitled project', files, activeFile, openFiles: [...new Set(openFiles)],
         settings: {
             theme: ['dark', 'light', 'system'].includes(settings.theme ?? '') ? settings.theme! : 'dark',
-            fontSize: typeof settings.fontSize === 'number' ? Math.max(10, Math.min(24, settings.fontSize)) : 13,
+            fontSize: typeof settings.fontSize === 'number' ? Math.max(10, Math.min(24, settings.fontSize)) : defaultSettings.fontSize,
             minimap: settings.minimap === true, wordWrap: settings.wordWrap === true,
             tabSize: [2, 4, 8].includes(settings.tabSize ?? 0) ? settings.tabSize! : 4,
         },

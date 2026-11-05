@@ -11,13 +11,13 @@ import type { StudioSettings } from './workspace';
 loader.config({ monaco });
 monaco.editor.defineTheme('glstudio-dark', {
     base: 'vs-dark', inherit: true,
-    rules: [{ token: 'comment', foreground: '85858F' }, { token: 'keyword', foreground: 'C4B5FD' }, { token: 'string', foreground: 'B2D9A0' }, { token: 'number', foreground: 'F0C58E' }, { token: 'type.identifier', foreground: '9CCFD8' }],
-    colors: { 'editor.background': '#19191c', 'editor.foreground': '#e4e4e7', 'editorLineNumber.foreground': '#74747f', 'editorLineNumber.activeForeground': '#d4d4d8', 'editor.lineHighlightBackground': '#212125', 'editor.selectionBackground': '#a78bfa30', 'editor.inactiveSelectionBackground': '#a78bfa18', 'editorCursor.foreground': '#c4b5fd', 'editorIndentGuide.background1': '#2b2b31', 'editorWidget.background': '#232327', 'editorSuggestWidget.background': '#232327', 'editorGutter.background': '#19191c' },
+    rules: [{ token: 'comment', foreground: '84969F' }, { token: 'keyword', foreground: 'F3AD78' }, { token: 'string', foreground: 'A7D5AE' }, { token: 'number', foreground: 'F1C992' }, { token: 'type.identifier', foreground: '8ECFB9' }],
+    colors: { 'editor.background': '#1c2226', 'editor.foreground': '#e9edef', 'editorLineNumber.foreground': '#83939e', 'editorLineNumber.activeForeground': '#d4d4d8', 'editor.lineHighlightBackground': '#273037', 'editor.selectionBackground': '#6acbbd30', 'editor.inactiveSelectionBackground': '#6acbbd18', 'editorCursor.foreground': '#82dfd0', 'editorIndentGuide.background1': '#344047', 'editorWidget.background': '#223139', 'editorSuggestWidget.background': '#223139', 'editorGutter.background': '#1c2226' },
 });
 monaco.editor.defineTheme('glstudio-light', {
     base: 'vs', inherit: true,
-    rules: [{ token: 'comment', foreground: '74817E' }, { token: 'keyword', foreground: '8B4DB8' }, { token: 'string', foreground: '287D54' }],
-    colors: { 'editor.background': '#ffffff', 'editor.lineHighlightBackground': '#f5f4f8', 'editorGutter.background': '#ffffff', 'editorLineNumber.foreground': '#787580', 'editorCursor.foreground': '#7047c6' },
+    rules: [{ token: 'comment', foreground: '63746E' }, { token: 'keyword', foreground: '8B4DB8' }, { token: 'string', foreground: '287D54' }],
+    colors: { 'editor.background': '#fbfdff', 'editor.lineHighlightBackground': '#f5f4f8', 'editorGutter.background': '#fbfdff', 'editorLineNumber.foreground': '#6d7180', 'editorCursor.foreground': '#7047c6' },
 });
 
 interface Props {
@@ -73,6 +73,6 @@ export default function CodeEditor({ file, files, settings, theme, diagnostics, 
         theme={theme === 'light' ? 'glstudio-light' : 'glstudio-dark'} onMount={mounted}
         onChange={value => onChange(value ?? '')} keepCurrentModel saveViewState
         loading={<div className="editor-loading"><span className="spinner" /> Loading editor…</div>}
-        options={{ automaticLayout: true, fontSize: settings.fontSize, fontFamily: "'JetBrains Mono Variable', 'Cascadia Mono', Consolas, monospace", fontLigatures: false, lineHeight: 23, minimap: { enabled: settings.minimap }, tabSize: settings.tabSize, insertSpaces: true, wordWrap: settings.wordWrap ? 'on' : 'off', padding: { top: 14, bottom: 24 }, scrollBeyondLastLine: false, renderLineHighlight: 'line', lineNumbersMinChars: 3, glyphMargin: false, folding: true, smoothScrolling: true, contextmenu: true, fixedOverflowWidgets: true, bracketPairColorization: { enabled: true }, overviewRulerBorder: false, hideCursorInOverviewRuler: true, scrollbar: { verticalScrollbarSize: 8, horizontalScrollbarSize: 8 }, stickyScroll: { enabled: false }, ariaLabel: `C++ editor, ${file.path}` }}
+        options={{ automaticLayout: true, fontSize: settings.fontSize, fontFamily: "'JetBrains Mono Variable', 'Cascadia Mono', Consolas, monospace", fontWeight: '450', fontLigatures: false, lineHeight: Math.round(settings.fontSize * 1.9), minimap: { enabled: settings.minimap }, tabSize: settings.tabSize, insertSpaces: true, wordWrap: settings.wordWrap ? 'on' : 'off', padding: { top: 18, bottom: 24 }, scrollBeyondLastLine: false, renderLineHighlight: 'line', lineNumbersMinChars: 3, glyphMargin: false, folding: true, smoothScrolling: true, contextmenu: true, fixedOverflowWidgets: true, bracketPairColorization: { enabled: true }, overviewRulerBorder: false, hideCursorInOverviewRuler: true, scrollbar: { verticalScrollbarSize: 8, horizontalScrollbarSize: 8 }, stickyScroll: { enabled: false }, ariaLabel: `C++ editor, ${file.path}` }}
     />;
 }

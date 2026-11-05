@@ -1,5 +1,49 @@
 import { lazy, Suspense, useCallback, useEffect, useId, useRef, useState, type CSSProperties, type ReactNode } from 'react';
-import { ArrowDownToLine, ArrowRight, BookOpen, Check, ChevronDown, ChevronRight, ChevronsLeftRight, Circle, CircleAlert, CircleCheck, CircleHelp, CircleX, Code2, Command, Copy, Download, Ellipsis, Expand, FileCode2, FilePlus2, Files, Folder, LayoutPanelLeft, LoaderCircle, Maximize2, Monitor, Moon, PanelBottom, PanelLeftClose, PanelLeftOpen, Pause, Pencil, Play, Plus, RotateCcw, Search, Settings2, Square, Sun, Terminal, Trash2, Upload, X } from 'lucide-react';
+import {
+    RiArrowDownLine as ArrowDownToLine,
+    RiArrowRightLine as ArrowRight,
+    RiBookOpenLine as BookOpen,
+    RiCheckLine as Check,
+    RiArrowDownSLine as ChevronDown,
+    RiArrowRightSLine as ChevronRight,
+    RiCodeSSlashLine as ChevronsLeftRight,
+    RiCircleLine as Circle,
+    RiErrorWarningLine as CircleAlert,
+    RiCheckboxCircleLine as CircleCheck,
+    RiQuestionLine as CircleHelp,
+    RiCloseCircleLine as CircleX,
+    RiCodeSSlashLine as Code2,
+    RiCommandLine as Command,
+    RiFileCopyLine as Copy,
+    RiDownloadLine as Download,
+    RiMoreLine as Ellipsis,
+    RiFullscreenLine as Expand,
+    RiFileCodeLine as FileCode2,
+    RiFileAddLine as FilePlus2,
+    RiFoldersLine as Files,
+    RiFolder3Line as Folder,
+    RiLayoutColumnLine as LayoutPanelLeft,
+    RiLoader4Line as LoaderCircle,
+    RiExpandDiagonalLine as Maximize2,
+    RiComputerLine as Monitor,
+    RiMoonClearLine as Moon,
+    RiLayoutBottomLine as PanelBottom,
+    RiSidebarFoldLine as PanelLeftClose,
+    RiSidebarUnfoldLine as PanelLeftOpen,
+    RiPauseLine as Pause,
+    RiEdit2Line as Pencil,
+    RiPlayFill as Play,
+    RiAddLine as Plus,
+    RiRestartLine as RotateCcw,
+    RiSearchLine as Search,
+    RiSettings4Line as Settings2,
+    RiStopFill as Square,
+    RiSunLine as Sun,
+    RiTerminalBoxLine as Terminal,
+    RiDeleteBin6Line as Trash2,
+    RiUploadLine as Upload,
+    RiCloseLine as X
+} from '@remixicon/react';
 import type { BuildArtifact, CompilerHealth, Diagnostic, RuntimeLog, RuntimeMetrics, RuntimeStatus, RuntimeStdin, SourceFile } from '../shared/contracts';
 import { checkCompiler, compileProject } from './compiler-client';
 import { Viewport, type ViewportHandle } from './Viewport';
@@ -295,7 +339,7 @@ export default function App() {
 
     return <div className={`studio-app ${workspace.layout.sidebar ? '' : 'sidebar-hidden'} mobile-${mobileView}`}>
         <header className="titlebar">
-            <a className="brand" href="#" onClick={event => event.preventDefault()} aria-label="GLStudio home"><span className="brand-symbol"><ChevronsLeftRight size={21} strokeWidth={2} /></span><span>GL<span className="brand-light">Studio</span></span></a>
+            <a className="brand" href="#" onClick={event => event.preventDefault()} aria-label="GLStudio home"><span className="brand-symbol"><ChevronsLeftRight size={21} /></span><span>GL<span className="brand-light">Studio</span></span></a>
             <div className="main-menu" ref={menuRef}>
                 <div className="menu-anchor"><button className={`text-button ${menu === 'project' ? 'selected' : ''}`} onClick={() => setMenu(menu === 'project' ? null : 'project')} aria-expanded={menu === 'project'}>Project<ChevronDown size={11} /></button>{menu === 'project' && <div className="dropdown"><button onClick={() => openFileDialog()}><FilePlus2 size={15} />New file</button><button onClick={() => { setDialog('examples'); setMenu(null); }}><BookOpen size={15} />Open example</button><div className="menu-divider" /><button onClick={exportProject}><Download size={15} />Export project<span>Ctrl S</span></button><button onClick={() => { importInput.current?.click(); setMenu(null); }}><Upload size={15} />Import project</button></div>}</div>
                 <div className="menu-anchor"><button className={`text-button ${menu === 'view' ? 'selected' : ''}`} onClick={() => setMenu(menu === 'view' ? null : 'view')} aria-expanded={menu === 'view'}>View<ChevronDown size={11} /></button>{menu === 'view' && <div className="dropdown"><button onClick={() => { updateLayout({ mode: 'split' }); setMenu(null); }}><LayoutPanelLeft size={15} />Split workspace</button><button onClick={() => { updateLayout({ mode: 'editor' }); setMobileView('editor'); setMenu(null); }}><Code2 size={15} />Editor only</button><button onClick={() => { updateLayout({ mode: 'output' }); setMobileView('output'); setMenu(null); }}><Monitor size={15} />Output only</button><div className="menu-divider" /><button onClick={() => { updateLayout({ ...defaultLayout }); setMenu(null); }}><RotateCcw size={15} />Reset layout</button><button onClick={() => { setDialog('settings'); setMenu(null); }}><Settings2 size={15} />Settings</button></div>}</div>
@@ -306,8 +350,8 @@ export default function App() {
 
         <div className="app-body">
             <nav className="activity-bar" aria-label="Workspace tools">
-                <div><IconButton label="Explorer (Ctrl+B)" active={workspace.layout.sidebar} onClick={() => updateLayout({ sidebar: !workspace.layout.sidebar })}><Files size={21} strokeWidth={1.6} /></IconButton><IconButton label="Find in editor" onClick={() => { setSearchToken(previous => previous + 1); setMobileView('editor'); updateLayout({ mode: 'split' }); }}><Search size={21} strokeWidth={1.6} /></IconButton><IconButton label="Example projects" active={dialog === 'examples'} onClick={() => setDialog('examples')}><BookOpen size={21} strokeWidth={1.6} /></IconButton><IconButton label="Build output" active={workspace.layout.terminal} onClick={() => { updateLayout({ terminal: !workspace.layout.terminal }); setTerminalTab('output'); }}><Terminal size={21} strokeWidth={1.6} /></IconButton></div>
-                <div><IconButton label="Compatibility and keyboard shortcuts" onClick={() => setDialog('help')}><CircleHelp size={20} strokeWidth={1.6} /></IconButton><IconButton label="Settings" onClick={() => setDialog('settings')}><Settings2 size={21} strokeWidth={1.6} /></IconButton></div>
+                <div><IconButton label="Explorer (Ctrl+B)" active={workspace.layout.sidebar} onClick={() => updateLayout({ sidebar: !workspace.layout.sidebar })}><Files size={21} /></IconButton><IconButton label="Find in editor" onClick={() => { setSearchToken(previous => previous + 1); setMobileView('editor'); updateLayout({ mode: 'split' }); }}><Search size={21} /></IconButton><IconButton label="Example projects" active={dialog === 'examples'} onClick={() => setDialog('examples')}><BookOpen size={21} /></IconButton><IconButton label="Build output" active={workspace.layout.terminal} onClick={() => { updateLayout({ terminal: !workspace.layout.terminal }); setTerminalTab('output'); }}><Terminal size={21} /></IconButton></div>
+                <div><IconButton label="Compatibility and keyboard shortcuts" onClick={() => setDialog('help')}><CircleHelp size={20} /></IconButton><IconButton label="Settings" onClick={() => setDialog('settings')}><Settings2 size={21} /></IconButton></div>
             </nav>
             <aside className="sidebar" aria-label="File explorer">
                 <div className="sidebar-heading"><span>Files</span><div><IconButton label="New file" onClick={() => openFileDialog()}><FilePlus2 size={15} /></IconButton><IconButton label="Hide sidebar" onClick={() => updateLayout({ sidebar: false })}><PanelLeftClose size={15} /></IconButton></div></div>
@@ -321,7 +365,7 @@ export default function App() {
             </aside>
 
             <main className="main-workspace">
-                <div className="workspace-toolbar"><div className="workspace-name"><Code2 size={14} /><span>C++ workspace</span></div><div className="run-controls"><button className="example-button" onClick={() => setDialog('examples')}><BookOpen size={14} /><span>Examples</span></button><span className="toolbar-separator" />{(active || compiling) && <IconButton label="Stop execution" onClick={stop}><Square size={14} fill="currentColor" /></IconButton>}<button className="run-button" onClick={() => void run()} disabled={compiling || healthLoading || !health?.available} title={health?.available ? 'Compile and run (Ctrl+Enter)' : health?.message}>{compiling ? <LoaderCircle size={14} className="spin" /> : <Play size={14} fill="currentColor" />}<span>{compiling ? 'Compiling…' : 'Run code'}</span><kbd>Ctrl ↵</kbd></button></div></div>
+                <div className="workspace-toolbar"><div className="workspace-name"><Code2 size={14} /><span>C++ workspace</span></div><div className="run-controls"><button className="example-button" onClick={() => setDialog('examples')}><BookOpen size={14} /><span>Examples</span></button><span className="toolbar-separator" />{(active || compiling) && <IconButton label="Stop execution" onClick={stop}><Square size={14} /></IconButton>}<button className="run-button" onClick={() => void run()} disabled={compiling || healthLoading || !health?.available} title={health?.available ? 'Compile and run (Ctrl+Enter)' : health?.message}>{compiling ? <LoaderCircle size={14} className="spin" /> : <Play size={14} />}<span>{compiling ? 'Compiling…' : 'Run code'}</span><kbd>Ctrl ↵</kbd></button></div></div>
                 <div className="mobile-switch"><button className={mobileView === 'editor' ? 'active' : ''} onClick={() => { setMobileView('editor'); updateLayout({ mode: 'split' }); }}><Code2 size={14} />Editor</button><button className={mobileView === 'output' ? 'active' : ''} onClick={() => { setMobileView('output'); updateLayout({ mode: 'split' }); }}><Monitor size={14} />Output</button></div>
                 <div className={`working-area layout-${workspace.layout.mode}`} ref={workspaceArea} style={{ '--editor-width': `${workspace.layout.split}%` } as CSSProperties}>
                     <section className="editor-panel" aria-label="Source editor">
@@ -333,7 +377,7 @@ export default function App() {
                     <section className="output-panel" ref={outputPanel} aria-label="Graphical output" aria-describedby="canvas-input-hint">
                         <span id="canvas-input-hint" className="visually-hidden">Click the canvas to focus it before using keyboard and mouse controls.</span>
                         <div className="output-heading"><div title="Click the canvas to focus it before using keyboard and mouse controls."><Monitor size={14} /><span>OUTPUT</span><span className="webgl-badge">WebGL</span></div><div><IconButton label="Capture screenshot" disabled={!artifact || !active} onClick={() => viewport.current?.capture()}><Download size={14} /></IconButton><IconButton label="Fullscreen output" onClick={() => void fullscreen()}><Expand size={14} /></IconButton></div></div>
-                        <div className="output-status"><span className={`runtime-indicator ${runtimeStatus} ${compiling ? 'building' : ''}`} /><span>{statusText}</span>{sourceChanged && <span className="changed-source" title="The viewport shows the last successful build">Source modified</span>}<div className="output-controls"><IconButton label={paused ? 'Resume animation callbacks' : 'Pause animation callbacks'} disabled={!artifact || !active || stdin.waiting} active={paused} onClick={() => setPaused(previous => !previous)}>{paused ? <Play size={12} fill="currentColor" /> : <Pause size={12} fill="currentColor" />}</IconButton><IconButton label="Restart last successful build" disabled={!artifact} onClick={() => { setRunKey(previous => previous + 1); setPaused(false); }}><RotateCcw size={13} /></IconButton><IconButton label="Stop runtime" disabled={!artifact} onClick={stop}><Square size={11} fill="currentColor" /></IconButton></div></div>
+                        <div className="output-status"><span className={`runtime-indicator ${runtimeStatus} ${compiling ? 'building' : ''}`} /><span>{statusText}</span>{sourceChanged && <span className="changed-source" title="The viewport shows the last successful build">Source modified</span>}<div className="output-controls"><IconButton label={paused ? 'Resume animation callbacks' : 'Pause animation callbacks'} disabled={!artifact || !active || stdin.waiting} active={paused} onClick={() => setPaused(previous => !previous)}>{paused ? <Play size={12} /> : <Pause size={12} />}</IconButton><IconButton label="Restart last successful build" disabled={!artifact} onClick={() => { setRunKey(previous => previous + 1); setPaused(false); }}><RotateCcw size={13} /></IconButton><IconButton label="Stop runtime" disabled={!artifact} onClick={stop}><Square size={11} /></IconButton></div></div>
                         <div className="viewport-container"><Viewport ref={viewport} artifact={artifact} runKey={runKey} paused={paused} onLog={pushLog} onStatus={handleRuntimeStatus} onMetrics={setMetrics} onStdin={handleStdin} /></div>
                         <div className="viewport-footer" aria-label="Canvas metrics"><span aria-label="Canvas size" title="Drawing buffer size in pixels">{metrics.width && artifact ? `${metrics.width} × ${metrics.height}` : '— × —'}</span><span aria-label="Frame rate">{active && metrics.fps > 0 ? `${Math.round(metrics.fps)} FPS` : '— FPS'}</span></div>
                     </section>

@@ -1,5 +1,5 @@
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react';
-import { Box, MonitorOff } from 'lucide-react';
+import { RiBox3Line as Box, RiComputerLine as MonitorOff } from '@remixicon/react';
 import type { BuildArtifact, RuntimeLog, RuntimeMetrics, RuntimeStatus, RuntimeStdin } from '../shared/contracts';
 import workerSource from './runtime/worker.js?raw';
 import { runtimeDocument } from './runtime/frame';
@@ -105,7 +105,7 @@ export const Viewport = forwardRef<ViewportHandle, Props>(function Viewport(prop
   return <div className="graphics-runtime" style={{ position: 'relative', width: '100%', height: '100%', minHeight: 180, overflow: 'hidden' }}>
     <div ref={host} style={{ width: '100%', height: '100%' }} />
     {(!artifact || error) && <div style={{ position: 'absolute', inset: 0, display: 'grid', placeContent: 'center', gap: 12, textAlign: 'center', padding: 32, color: 'var(--text-muted, #87929f)', pointerEvents: 'none' }}>
-      {error ? <MonitorOff size={32} style={{ margin: '0 auto' }} /> : <Box size={38} strokeWidth={1.15} style={{ margin: '0 auto', opacity: .7 }} />}
+      {error ? <MonitorOff size={32} style={{ margin: '0 auto' }} /> : <Box size={38} style={{ margin: '0 auto', opacity: .7 }} />}
       <strong style={{ fontSize: 14, fontWeight: 500, color: 'var(--text, #d9e1e9)' }}>{error ? 'Program stopped' : 'Your canvas awaits'}</strong>
       <span style={{ maxWidth: 340, fontSize: 12, lineHeight: 1.7 }}>{error || 'Run your C++ program to bring your graphics to life.'}</span>
       {!error && <kbd style={{ fontSize: 11 }}>Ctrl + Enter to build & run</kbd>}
