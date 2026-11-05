@@ -1,6 +1,6 @@
 # GL Studio
 
-A browser workspace for learning C++ computer graphics. The initial local MVP combines a Monaco editor, a real Emscripten compiler, and an isolated WebGL viewport.
+A browser workspace for learning C++ computer graphics, combining a Monaco editor, a real Emscripten compiler, and an isolated WebGL viewport. It supports trusted local development and a protected Vercel deployment with disposable compiler VMs; see [cloud deployment](docs/deployment.md).
 
 ## Start locally
 

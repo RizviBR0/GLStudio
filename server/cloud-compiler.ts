@@ -1,4 +1,4 @@
-import { Sandbox } from '@vercel/sandbox';
+import { Sandbox, Snapshot } from '@vercel/sandbox';
 import { readFile } from 'node:fs/promises';
 import { randomUUID } from 'node:crypto';
 import path from 'node:path';
@@ -6,6 +6,7 @@ import type { BuildResult, CompilerHealth } from '../shared/contracts.js';
 import { compilerArguments, parseDiagnostics, PINNED_EMSDK_VERSION, PROJECT_ROOT, sourceHash, validateFiles, CompileInputError } from './compiler.js';
 
 const JOB = '/home/compiler/job';
+const RUNTIME_ROOT = path.join(process.env.VERCEL ? process.cwd() : PROJECT_ROOT, 'runtime');
 const RUNTIME_FILES = ['glut.library.js', 'stdio.library.js', 'cloud-build.py', 'include/windows.h', 'include/GL/glut.h', 'include/GL/freeglut.h'];
 let active = false;
 let requests: number[] = [];
@@ -14,7 +15,7 @@ export class CloudBusyError extends Error {}
 export class CloudUnavailableError extends Error {}
 
 export function cloudCompilerHealth(): CompilerHealth {
-  const available = process.env.GLSTUDIO_CLOUD_COMPILER_ENABLE === '1' && Boolean(process.env.GLSTUDIO_COMPILER_SNAPSHOT);
+  const available = process.env.GLSTUDIO_CLOUD_COMPILER_ENABLE === '1' && Boolean(process.env.GLSTUDIO_COMPILER_TEMPLATE || process.env.GLSTUDIO_COMPILER_SNAPSHOT);
   return {
     available, version: PINNED_EMSDK_VERSION, mode: 'cloud-sandbox',
     message: available ? 'Builds run in disposable, network-isolated compiler VMs. Deployment access is managed by Vercel.' : 'The cloud compiler toolchain is not configured yet.',
@@ -31,8 +32,23 @@ export async function compileInSandbox(input: unknown, signal?: AbortSignal): Pr
   const started = performance.now();
   let sandbox: Sandbox | undefined;
   try {
+    let snapshotId = process.env.GLSTUDIO_COMPILER_SNAPSHOT;
+    if (process.env.GLSTUDIO_COMPILER_TEMPLATE) {
+      const template = await Sandbox.get({ name: process.env.GLSTUDIO_COMPILER_TEMPLATE, signal });
+      snapshotId = template.currentSnapshotId;
+      if (!snapshotId) throw new CloudUnavailableError('The compiler toolchain template is not ready yet.');
+      const baseline = await Snapshot.get({ snapshotId, signal });
+      if (baseline.expiresAt) {
+        // Seal the clean template before any student source is uploaded. The
+        // SDK supports non-expiring snapshots and keeps this named template's
+        // future automatic snapshots durable as well.
+        await template.update({ snapshotExpiration: 0, persistent: true }, { signal });
+        const sealed = await template.snapshot({ expiration: 0, signal });
+        snapshotId = sealed.snapshotId;
+      }
+    }
     sandbox = await Sandbox.create({
-      source: { type: 'snapshot', snapshotId: process.env.GLSTUDIO_COMPILER_SNAPSHOT! },
+      source: { type: 'snapshot', snapshotId: snapshotId! },
       persistent: false, networkPolicy: 'deny-all', timeout: 130_000,
       resources: { vcpus: 2 }, region: 'iad1', signal,
     });
@@ -43,7 +59,7 @@ export async function compileInSandbox(input: unknown, signal?: AbortSignal): Pr
       const user = sandbox.asUser('compiler');
       await user.mkDir(`${JOB}/src`, { signal });
       await user.mkDir(`${JOB}/runtime/include/GL`, { signal });
-      const runtime = await Promise.all(RUNTIME_FILES.map(async file => ({ path: `${JOB}/runtime/${file}`, content: await readFile(path.join(PROJECT_ROOT, 'runtime', file)) })));
+      const runtime = await Promise.all(RUNTIME_FILES.map(async file => ({ path: `${JOB}/runtime/${file}`, content: await readFile(path.join(RUNTIME_ROOT, file)) })));
       await user.writeFiles([
         ...runtime,
         ...files.map(file => ({ path: `${JOB}/src/${file.path}`, content: Buffer.from(file.content) })),
