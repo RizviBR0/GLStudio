@@ -3,6 +3,8 @@ import Editor, { loader, type OnMount } from '@monaco-editor/react';
 import * as monaco from 'monaco-editor/editor/editor.api.js';
 import 'monaco-editor/languages/definitions/cpp/register.js';
 import 'monaco-editor/editor/contrib/find/browser/findController.js';
+// The lightweight editor API does not register the bundled Codicon font.
+import 'monaco-editor/features/codicon/register.js';
 import type { Diagnostic, SourceFile } from '../shared/contracts';
 import type { StudioSettings } from './workspace';
 
