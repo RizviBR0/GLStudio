@@ -511,16 +511,9 @@ svg {
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.project-dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 2px;
-  background: var(--accent);
+.workspace-name > svg {
+  color: var(--text-muted);
   flex: none;
-}
-.workspace-divider {
-  color: var(--muted);
-  margin: 0 1px;
 }
 .run-controls {
   display: flex;
@@ -667,12 +660,10 @@ svg {
   white-space: nowrap;
   overflow: hidden;
 }
-.breadcrumbs > span:first-child {
-  max-width: 150px;
+.breadcrumbs .breadcrumb-path {
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
-}
-.breadcrumbs > span:nth-last-child(2) {
   color: var(--text-muted);
 }
 .editor-language {
@@ -1694,10 +1685,6 @@ svg {
     display: none;
   }
   .local-label {
-    display: none;
-  }
-  .workspace-name > .muted,
-  .workspace-divider {
     display: none;
   }
   .viewport-footer {
