@@ -57,8 +57,10 @@ export async function compileInSandbox(input: unknown, signal?: AbortSignal): Pr
     try {
       if (signal?.aborted) throw new Error('Build cancelled.');
       const user = sandbox.asUser('compiler');
-      await user.mkDir(`${JOB}/src`, { signal });
-      await user.mkDir(`${JOB}/runtime/include/GL`, { signal });
+      // The file API creates one directory at a time, without mkdir -p.
+      for (const directory of [JOB, `${JOB}/src`, `${JOB}/runtime`, `${JOB}/runtime/include`, `${JOB}/runtime/include/GL`]) {
+        await user.mkDir(directory, { signal });
+      }
       const runtime = await Promise.all(RUNTIME_FILES.map(async file => ({ path: `${JOB}/runtime/${file}`, content: await readFile(path.join(RUNTIME_ROOT, file)) })));
       await user.writeFiles([
         ...runtime,
@@ -106,7 +108,7 @@ export async function cloudCompileResponse(request: Request): Promise<Response> 
     return Response.json(await compileInSandbox(input.files, request.signal), { headers });
   } catch (error) {
     const status = error instanceof CompileInputError ? 400 : error instanceof CloudBusyError ? 429 : error instanceof CloudUnavailableError ? 503 : request.signal.aborted ? 499 : 500;
-    if (status === 500) console.error('Cloud compilation failed:', error instanceof Error ? error.name : 'UnknownError');
+    if (status === 500) console.error('Cloud compilation failed:', error instanceof Error ? { name: error.name, message: error.message.slice(0, 1500) } : 'UnknownError');
     const message = status === 500 ? 'The isolated compiler failed. Retry the build; check Vercel logs if it persists.' : error instanceof Error ? error.message : 'Compilation failed.';
     return Response.json({ ok: false, durationMs: 0, diagnostics: [], logs: message }, { status, headers: { ...headers, ...(status === 429 ? { 'Retry-After': '60' } : {}) } });
   }
