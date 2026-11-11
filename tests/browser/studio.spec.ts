@@ -82,6 +82,8 @@ test('a 600 × 600 GLUT texture keeps its shape and export size as the preview r
       );
     }).toBeLessThan(1);
     await expect(size).toHaveText('600 × 600');
+    const preview = PNG.sync.read(await frame.screenshot({ scale: 'css' }));
+    expect(Math.max(...preview.data.subarray(0, 3))).toBeLessThan(100);
     const image = PNG.sync.read(await canvas.screenshot({ scale: 'css' }));
     let left = image.width, right = -1, top = image.height, bottom = -1;
     for (let y = 0; y < image.height; y++) {

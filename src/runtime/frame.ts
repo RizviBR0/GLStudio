@@ -4,6 +4,7 @@ export const runtimeDocument = `<!doctype html>
 <html><head><meta charset="utf-8">
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline' blob: 'wasm-unsafe-eval'; worker-src blob:; connect-src 'none'; img-src blob: data:; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'">
 <style>
+html{color-scheme:light}
 html,body{margin:0;width:100%;height:100%;overflow:hidden}
 body{display:grid;place-items:center}
 canvas{display:block;width:0;height:0;outline:none;touch-action:none}

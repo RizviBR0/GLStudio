@@ -50,7 +50,6 @@ export const Viewport = forwardRef<ViewportHandle, Props>(function Viewport(prop
     frame.setAttribute('sandbox', 'allow-scripts');
     frame.setAttribute('allow', 'fullscreen');
     frame.referrerPolicy = 'no-referrer';
-    frame.style.cssText = 'display:block;width:100%;height:100%;border:0;';
     frame.srcdoc = runtimeDocument;
     const connection = new MessageChannel();
     channel.current = connection.port1;
