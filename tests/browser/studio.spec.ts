@@ -17,7 +17,7 @@ async function openWorkspace(page: Page, files?: SourceFile[]) {
   await page.goto('/');
   await expect(page.getByRole('button', { name: 'Compiler connected' })).toBeVisible();
   await expect(page.locator('.monaco-editor')).toBeVisible();
-  await expect(page.locator('.view-lines')).toContainText(files?.[0].content.split('\n')[0] || '// Welcome to GL Studio.');
+  await expect(page.locator('.view-lines')).toContainText(workspace.files[0].content.split('\n')[0].trimEnd());
 }
 
 async function run(page: Page) {
@@ -34,7 +34,7 @@ test('real C++ renders pixels, exports a screenshot, pauses, resizes and stops',
   page.on('pageerror', error => errors.push(error.message));
   await openWorkspace(page);
   await run(page);
-  const canvas = page.frameLocator('iframe[title="Isolated C++ graphics output"]').locator('canvas');
+  const canvas = page.frameLocator('iframe[title="Graphics output"]').locator('canvas');
   await expect.poll(async () => {
     const image = PNG.sync.read(await canvas.screenshot());
     const i = (Math.floor(image.height / 2) * image.width + Math.floor(image.width / 2)) * 4;
@@ -43,9 +43,9 @@ test('real C++ renders pixels, exports a screenshot, pauses, resizes and stops',
   const frame = page.frames().find(frame => frame.parentFrame())!;
   expect(await frame.evaluate(() => { try { void parent.document.body; return false; } catch { return true; } })).toBe(true);
   await page.screenshot({ path: '.cache/studio-desktop.png', fullPage: true });
-  await page.getByRole('button', { name: 'Pause animation callbacks', exact: true }).click();
+  await page.getByRole('button', { name: 'Pause animation', exact: true }).click();
   await expect(page.locator('.output-status')).toContainText('Paused');
-  await page.getByRole('button', { name: 'Resume animation callbacks', exact: true }).click();
+  await page.getByRole('button', { name: 'Resume animation', exact: true }).click();
   await expect(page.locator('.output-status')).toContainText('Running');
   const download = page.waitForEvent('download');
   await page.getByRole('button', { name: 'Capture screenshot', exact: true }).click();
@@ -53,10 +53,53 @@ test('real C++ renders pixels, exports a screenshot, pauses, resizes and stops',
   const splitter = page.getByRole('separator', { name: 'Resize editor and output' });
   await splitter.focus(); await page.keyboard.press('ArrowLeft');
   await expect(splitter).toHaveAttribute('aria-valuenow', '53');
-  await page.getByRole('button', { name: 'Stop runtime', exact: true }).click();
+  await page.getByRole('button', { name: 'Stop program', exact: true }).click();
   await expect(page.locator('iframe')).toHaveCount(0);
   await expect(page.locator('.output-status')).toContainText('Stopped');
   expect(errors).toEqual([]);
+});
+
+test('a 600 × 600 GLUT texture keeps its shape and export size as the preview resizes', async ({ page }) => {
+  const content = await readFile(new URL('../fixtures/texture-square.cpp', import.meta.url), 'utf8');
+  await openWorkspace(page, [{ path: 'main.cpp', content }]);
+  await run(page);
+  const frame = page.locator('iframe[title="Graphics output"]');
+  const canvas = frame.contentFrame().locator('canvas');
+  const size = page.getByLabel('Canvas size', { exact: true });
+  await expect(size).toHaveText('600 × 600');
+
+  for (const viewport of [{ width: 1750, height: 600 }, { width: 1030, height: 1040 }]) {
+    await page.setViewportSize(viewport);
+    await expect.poll(async () => {
+      const bounds = (await canvas.boundingBox())!;
+      const available = (await frame.boundingBox())!;
+      const side = Math.min(available.width, available.height);
+      return Math.max(
+        Math.abs(bounds.width - side),
+        Math.abs(bounds.height - side),
+        Math.abs(bounds.x + bounds.width / 2 - available.x - available.width / 2),
+        Math.abs(bounds.y + bounds.height / 2 - available.y - available.height / 2),
+      );
+    }).toBeLessThan(1);
+    await expect(size).toHaveText('600 × 600');
+    const image = PNG.sync.read(await canvas.screenshot({ scale: 'css' }));
+    let left = image.width, right = -1, top = image.height, bottom = -1;
+    for (let y = 0; y < image.height; y++) {
+      for (let x = 0; x < image.width; x++) {
+        const index = (y * image.width + x) * 4;
+        if (image.data[index] < 200 || image.data[index + 2] > 60) continue;
+        left = Math.min(left, x); right = Math.max(right, x);
+        top = Math.min(top, y); bottom = Math.max(bottom, y);
+      }
+    }
+    expect(right - left).toBeGreaterThan(image.width * 0.4);
+    expect(Math.abs((right - left) - (bottom - top))).toBeLessThanOrEqual(2);
+  }
+
+  const download = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'Capture screenshot', exact: true }).click();
+  const image = PNG.sync.read(await readFile(await (await download).path()));
+  expect([image.width, image.height]).toEqual([600, 600]);
 });
 
 test('compiler diagnostics preserve the editor filename and line', async ({ page }) => {
@@ -80,16 +123,16 @@ test('a tight C++ loop cannot block the IDE or its Stop control', async ({ page 
   await page.getByRole('button', { name: 'Settings', exact: true }).first().click({ timeout: 2000 });
   await expect(page.getByRole('dialog')).toBeVisible({ timeout: 2000 });
   await page.getByRole('button', { name: 'Close dialog' }).click();
-  await page.getByRole('button', { name: 'Stop runtime', exact: true }).click({ timeout: 2000 });
+  await page.getByRole('button', { name: 'Stop program', exact: true }).click({ timeout: 2000 });
   await expect(page.locator('iframe')).toHaveCount(0, { timeout: 2000 });
   await expect(page.locator('.output-status')).toContainText('Stopped');
   const secondBuild = page.waitForResponse(response => response.url().endsWith('/api/compile'));
   await page.getByRole('button', { name: 'Run code' }).click();
   expect((await (await secondBuild).json()).ok).toBe(true);
   await expect(page.locator('.output-status')).toContainText('Running');
-  await expect(page.locator('.output-status')).toContainText('Needs attention', { timeout: 16_000 });
-  await expect(page.locator('.terminal-body')).toContainText('stopped responding for 12 seconds and was terminated');
-  await page.getByRole('button', { name: 'Stop runtime', exact: true }).click();
+  await expect(page.locator('.output-status')).toContainText('Program error', { timeout: 16_000 });
+  await expect(page.locator('.terminal-body')).toContainText('Program stopped responding for 12 seconds.');
+  await page.getByRole('button', { name: 'Stop program', exact: true }).click();
 });
 
 test('timer animation, keyboard, mouse and reshape callbacks run in the graphics worker', async ({ page }) => {
@@ -97,26 +140,35 @@ test('timer animation, keyboard, mouse and reshape callbacks run in the graphics
   await openWorkspace(page, [{ path: 'main.cpp', content }]);
   await run(page);
   await expect(page.locator('.viewport-footer')).toContainText(/[1-9]\d* FPS/);
+  await expect(page.getByLabel('Canvas size', { exact: true })).toHaveText('640 × 480');
+  await expect(page.locator('.terminal-body')).toContainText('reshape 640 480');
   const canvas = page.frameLocator('iframe').locator('canvas');
+  const bounds = (await canvas.boundingBox())!;
   await canvas.click({ position: { x: 100, y: 70 } });
   await page.keyboard.press('a');
   await expect(page.locator('.terminal-body')).toContainText(/mouse 0 0 at \d+ \d+/);
   const pointer = (await page.locator('.terminal-body').innerText()).match(/mouse 0 0 at (\d+) (\d+)/)!;
-  expect(Math.abs(Number(pointer[1]) - 100)).toBeLessThanOrEqual(1);
-  expect(Math.abs(Number(pointer[2]) - 70)).toBeLessThanOrEqual(1);
+  expect(Math.abs(Number(pointer[1]) - 100 * 640 / bounds.width)).toBeLessThanOrEqual(2);
+  expect(Math.abs(Number(pointer[2]) - 70 * 480 / bounds.height)).toBeLessThanOrEqual(2);
   await expect(page.locator('.terminal-body')).toContainText(`key 97 at ${pointer[1]} ${pointer[2]}`);
-  await page.getByRole('button', { name: 'Pause animation callbacks', exact: true }).click();
+  await page.getByRole('button', { name: 'Pause animation', exact: true }).click();
   await expect(page.locator('.output-status')).toContainText('Paused');
   const paused = await canvas.screenshot();
   await page.waitForTimeout(350);
   expect(await canvas.screenshot()).toEqual(paused);
-  await page.getByRole('button', { name: 'Resume animation callbacks', exact: true }).click();
+  await page.getByRole('button', { name: 'Resume animation', exact: true }).click();
   await expect.poll(async () => (await canvas.screenshot()).equals(paused)).toBe(false);
-  const before = (await page.locator('.terminal-body').innerText()).match(/reshape \d+ \d+/g)?.length ?? 0;
   await page.getByRole('separator', { name: 'Resize editor and output' }).focus();
-  await page.keyboard.press('ArrowRight');
-  await expect.poll(async () => (await page.locator('.terminal-body').innerText()).match(/reshape \d+ \d+/g)?.length ?? 0).toBeGreaterThan(before);
-  await page.getByRole('button', { name: 'Stop runtime', exact: true }).click();
+  for (let i = 0; i < 8; i++) await page.keyboard.press('ArrowRight');
+  await expect.poll(async () => (await canvas.boundingBox())!.width).toBeLessThan(bounds.width - 20);
+  await canvas.click();
+  const clicks = page.locator('.terminal-body').getByText(/^mouse 0 0 at \d+ \d+$/);
+  await expect(clicks).toHaveCount(2);
+  const [x, y] = (await clicks.last().innerText()).split(' ').slice(-2).map(Number);
+  expect(Math.abs(x - 320)).toBeLessThanOrEqual(2);
+  expect(Math.abs(y - 240)).toBeLessThanOrEqual(2);
+  await expect(page.locator('.terminal-body').getByText(/^reshape \d+ \d+$/)).toHaveCount(1);
+  await page.getByRole('button', { name: 'Stop program', exact: true }).click();
 });
 
 test('the DDA assignment renders points from its C++ algorithm', async ({ page }) => {

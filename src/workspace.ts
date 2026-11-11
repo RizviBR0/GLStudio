@@ -8,7 +8,7 @@ export interface Workspace { version: 1; name: string; files: SourceFile[]; acti
 export const STORAGE_KEY = 'glstudio.workspace.v1';
 export const defaultSettings: StudioSettings = { theme: 'dark', fontSize: 14, minimap: false, wordWrap: false, tabSize: 4 };
 export const defaultLayout: StudioLayout = { sidebar: true, terminal: true, split: 55, panelHeight: 190, mode: 'split' };
-export const defaultWorkspace = (): Workspace => ({ version: 1, name: 'Hello, triangle', files: examples[0].files.map(file => ({ ...file })), activeFile: 'main.cpp', openFiles: ['main.cpp'], settings: { ...defaultSettings }, layout: { ...defaultLayout }, updatedAt: Date.now() });
+export const defaultWorkspace = (): Workspace => ({ version: 1, name: examples[0].name, files: examples[0].files.map(file => ({ ...file })), activeFile: 'main.cpp', openFiles: ['main.cpp'], settings: { ...defaultSettings }, layout: { ...defaultLayout }, updatedAt: Date.now() });
 
 export function validPath(path: string): boolean {
     return path.length <= 120 && /^(?:[a-zA-Z0-9_-]+\/)*[a-zA-Z0-9_-]+\.(cpp|cc|cxx|h|hpp)$/i.test(path);

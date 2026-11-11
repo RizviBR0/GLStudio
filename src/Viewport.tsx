@@ -1,5 +1,4 @@
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react';
-import { RiBox3Line as Box, RiComputerLine as MonitorOff } from '@remixicon/react';
 import type { BuildArtifact, RuntimeLog, RuntimeMetrics, RuntimeStatus, RuntimeStdin } from '../shared/contracts';
 import workerSource from './runtime/worker.js?raw';
 import { runtimeDocument } from './runtime/frame';
@@ -39,14 +38,15 @@ export const Viewport = forwardRef<ViewportHandle, Props>(function Viewport(prop
     setError('');
     stdin.current = { waiting: false, requestId: 0 };
     callbacks.current.onStdin?.(stdin.current);
+    callbacks.current.onMetrics?.({ fps: 0, width: 0, height: 0 });
     if (!artifact || !host.current) return;
     if (typeof OffscreenCanvas === 'undefined' || !HTMLCanvasElement.prototype.transferControlToOffscreen) {
-      const message = 'This browser cannot run the isolated graphics viewport. Use a current desktop browser with OffscreenCanvas support.';
+      const message = 'Graphics output requires a browser with OffscreenCanvas support.';
       setError(message); callbacks.current.onStatus('error', message); return;
     }
     callbacks.current.onStatus('loading');
     const frame = document.createElement('iframe');
-    frame.title = 'Isolated C++ graphics output';
+    frame.title = 'Graphics output';
     frame.setAttribute('sandbox', 'allow-scripts');
     frame.setAttribute('allow', 'fullscreen');
     frame.referrerPolicy = 'no-referrer';
@@ -58,7 +58,7 @@ export const Viewport = forwardRef<ViewportHandle, Props>(function Viewport(prop
     let started = false;
     const timeout = window.setTimeout(() => {
       if (!alive || started) return;
-      const message = 'The isolated runtime did not start. Your browser may be blocking sandboxed workers.';
+      const message = 'Program startup timed out.';
       setError(message); callbacks.current.onStatus('error', message); frame.remove();
     }, 15_000);
     connection.port1.onmessage = ({ data }) => {
@@ -73,7 +73,7 @@ export const Viewport = forwardRef<ViewportHandle, Props>(function Viewport(prop
       } else if (data.type === 'log' && typeof data.text === 'string') {
         callbacks.current.onLog({ level: data.level, text: data.text });
       } else if (data.type === 'status') {
-        if (data.status === 'error') setError(data.message || 'The graphics program stopped unexpectedly.');
+        if (data.status === 'error') setError(data.message || 'Program stopped unexpectedly.');
         if (data.status === 'error' || data.status === 'stopped') {
           stdin.current = { waiting: false, requestId: 0 };
           callbacks.current.onStdin?.(stdin.current);
@@ -87,7 +87,6 @@ export const Viewport = forwardRef<ViewportHandle, Props>(function Viewport(prop
         const url = URL.createObjectURL(data.blob);
         const link = document.createElement('a'); link.href = url; link.download = 'gl-studio-output.png'; link.click();
         window.setTimeout(() => URL.revokeObjectURL(url), 1000);
-        callbacks.current.onLog({ level: 'info', text: 'Screenshot exported as gl-studio-output.png.' });
       }
     };
     connection.port1.start();
@@ -102,13 +101,8 @@ export const Viewport = forwardRef<ViewportHandle, Props>(function Viewport(prop
 
   useEffect(() => { channel.current?.postMessage({ type: 'pause', paused }); }, [paused]);
 
-  return <div className="graphics-runtime" style={{ position: 'relative', width: '100%', height: '100%', minHeight: 180, overflow: 'hidden' }}>
-    <div ref={host} style={{ width: '100%', height: '100%' }} />
-    {(!artifact || error) && <div style={{ position: 'absolute', inset: 0, display: 'grid', placeContent: 'center', gap: 12, textAlign: 'center', padding: 32, color: 'var(--text-muted, #87929f)', pointerEvents: 'none' }}>
-      {error ? <MonitorOff size={32} style={{ margin: '0 auto' }} /> : <Box size={38} style={{ margin: '0 auto', opacity: .7 }} />}
-      <strong style={{ fontSize: 14, fontWeight: 500, color: 'var(--text, #d9e1e9)' }}>{error ? 'Program stopped' : 'Your canvas awaits'}</strong>
-      <span style={{ maxWidth: 340, fontSize: 12, lineHeight: 1.7 }}>{error || 'Run your C++ program to bring your graphics to life.'}</span>
-      {!error && <kbd style={{ fontSize: 11 }}>Ctrl + Enter to build & run</kbd>}
-    </div>}
-  </div>;
+  return <>
+    <div ref={host} className="graphics-runtime" />
+    {error && <div className="viewport-message" role="alert">{error}</div>}
+  </>;
 });

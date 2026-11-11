@@ -107,11 +107,10 @@ export default function App() {
     const [runtimeStatus, setRuntimeStatus] = useState<RuntimeStatus>('idle');
     const [stdin, setStdin] = useState<RuntimeStdin>({ waiting: false, requestId: 0 });
     const [metrics, setMetrics] = useState<RuntimeMetrics>({ fps: 0, width: 0, height: 0 });
-    const [lastBuild, setLastBuild] = useState<{ duration: number; ok: boolean } | null>(null);
     const [builtSnapshot, setBuiltSnapshot] = useState('');
     const [diagnostics, setDiagnostics] = useState<Diagnostic[]>([]);
     const [terminalTab, setTerminalTab] = useState<'output' | 'problems'>('output');
-    const [logs, setLogs] = useState<LogLine[]>([{ id: 0, time: '', level: 'info', text: 'GL Studio is ready. Run your code to bring the canvas to life.' }]);
+    const [logs, setLogs] = useState<LogLine[]>([]);
     const [logSearch, setLogSearch] = useState('');
     const [autoscroll, setAutoscroll] = useState(true);
     const [cursor, setCursor] = useState({ line: 1, column: 1 });
@@ -151,45 +150,45 @@ export default function App() {
     const refreshHealth = useCallback(async () => {
         setHealthLoading(true);
         try { setHealth(await checkCompiler()); }
-        catch { setHealth({ available: false, mode: 'trusted-local', message: 'The local compiler service is not reachable. Start the development server and try again.' }); }
+        catch { setHealth(null); }
         finally { setHealthLoading(false); }
     }, []);
     const stop = useCallback(() => {
+        const wasBuilding = Boolean(abort.current);
         requestId.current++;
         abort.current?.abort(); abort.current = null;
         setCompiling(false); setArtifact(null); setPaused(false); setRuntimeStatus('stopped');
-        pushLog({ level: 'info', text: 'Execution stopped.' });
-    }, [pushLog]);
+        if (wasBuilding || active) pushLog({ level: 'info', text: wasBuilding ? 'Build canceled.' : 'Program stopped.' });
+    }, [active, pushLog]);
     const run = useCallback(async () => {
-        if (!health?.available) { notify(health?.message ?? 'Checking the compiler. Please try again in a moment.', 'error'); return; }
+        if (!health?.available) { notify(health?.message ?? 'Compiler unavailable.', 'error'); return; }
         abort.current?.abort();
         const controller = new AbortController(); abort.current = controller;
         const token = ++requestId.current;
         const files = cloneFiles(workspaceRef.current.files);
         const snapshot = JSON.stringify(files);
-        setCompiling(true); setArtifact(null); setPaused(false); setRuntimeStatus('loading'); setDiagnostics([]); setLastBuild(null);
+        setCompiling(true); setArtifact(null); setPaused(false); setRuntimeStatus('loading'); setDiagnostics([]);
         updateLayout({ terminal: true }); setTerminalTab('output');
-        pushLog({ level: 'info', text: `Building ${files.length} source ${files.length === 1 ? 'file' : 'files'} · C++17 · WebAssembly` });
+        pushLog({ level: 'info', text: `Building ${files.length} ${files.length === 1 ? 'file' : 'files'}…` });
         try {
             const result = await compileProject(files, controller.signal);
             if (token !== requestId.current) return;
-            setLastBuild({ duration: result.durationMs, ok: result.ok });
             if (result.logs.trim()) pushLog({ level: result.ok ? 'info' : 'error', text: result.logs });
             if (snapshot !== JSON.stringify(workspaceRef.current.files)) {
-                setRuntimeStatus('idle'); pushLog({ level: 'warning', text: 'The source changed while compiling. Run again to build the current version.' });
-                notify('Source changed during the build. Run again to use your latest edits.'); return;
+                setRuntimeStatus('idle');
+                notify('Source changed during the build. Run code again.'); return;
             }
             setDiagnostics(result.diagnostics);
             if (result.ok && result.artifact) {
                 setBuiltSnapshot(snapshot); setArtifact(result.artifact); setRunKey(previous => previous + 1);
-                pushLog({ level: 'info', text: `Build finished in ${(result.durationMs / 1000).toFixed(2)}s. Starting isolated runtime…` });
+                pushLog({ level: 'info', text: `Built in ${(result.durationMs / 1000).toFixed(2)} s.` });
             } else {
                 setRuntimeStatus('error'); setTerminalTab(result.diagnostics.length ? 'problems' : 'output');
-                pushLog({ level: 'error', text: 'Build failed. Review the diagnostics below, make a change, and try again.' });
+                pushLog({ level: 'error', text: 'Build failed.' });
             }
         } catch (error) {
             if (token !== requestId.current || controller.signal.aborted) return;
-            const message = error instanceof Error ? error.message : 'Compilation failed unexpectedly.';
+            const message = error instanceof Error ? error.message : 'Build failed.';
             setRuntimeStatus('error'); pushLog({ level: 'error', text: message }); notify(message, 'error');
         } finally { if (token === requestId.current) { setCompiling(false); abort.current = null; } }
     }, [health, notify, pushLog, updateLayout]);
@@ -233,20 +232,22 @@ export default function App() {
     const loadExample = (example: Example) => {
         if (!window.confirm(`Open “${example.name}”? This replaces the current project. Export your project first to keep a separate copy.`)) return;
         stop(); setWorkspace(previous => ({ ...previous, name: example.name, files: cloneFiles(example.files), activeFile: example.files[0].path, openFiles: example.files.map(file => file.path) }));
-        setDiagnostics([]); setLastBuild(null); setDialog(null); setMobileView('editor'); notify(`${example.name} is ready to explore.`);
+        setDiagnostics([]); setDialog(null); setMobileView('editor');
     };
-    const exportProject = () => { downloadProject(workspaceRef.current); notify('Project exported. Keep the file as your backup.', 'success'); setMenu(null); };
+    const exportProject = () => { downloadProject(workspaceRef.current); notify('Project exported.', 'success'); setMenu(null); };
     const importProject = async (file: File) => {
         if (file.size > 2 * 1024 * 1024) { notify('Project imports are limited to 2 MB.', 'error'); return; }
         try {
             const imported = parseWorkspace(JSON.parse(await file.text()));
             if (!window.confirm(`Open “${imported.name}”? This replaces the current project. Export your work first if needed.`)) return;
-            stop(); setWorkspace(imported); setDiagnostics([]); setLastBuild(null); notify('Project imported.', 'success');
+            stop(); setWorkspace(imported); setDiagnostics([]); notify('Project imported.', 'success');
         } catch (error) { notify(error instanceof Error ? error.message : 'Could not import this project.', 'error'); }
     };
     const handleRuntimeStatus = useCallback((status: RuntimeStatus, message?: string) => {
         setRuntimeStatus(status);
-        if (message && status === 'error') pushLog({ level: 'error', text: message });
+        if (message && (status === 'error' || status === 'stopped')) {
+            pushLog({ level: status === 'error' ? 'error' : 'info', text: message });
+        }
     }, [pushLog]);
     const handleStdin = useCallback((state: RuntimeStdin) => {
         setStdin(state);
@@ -307,9 +308,9 @@ export default function App() {
         { name: 'Run project', detail: 'Compile and run the current source', shortcut: 'Ctrl ↵', icon: Play, action: () => void run() },
         { name: 'Stop execution', detail: 'Terminate the active runtime', shortcut: '', icon: Square, action: stop },
         { name: 'New file', detail: 'Add a C++ source or header', shortcut: '', icon: FilePlus2, action: () => openFileDialog() },
-        { name: 'Open examples', detail: 'Start with a graphics exercise', shortcut: '', icon: BookOpen, action: () => setDialog('examples') },
+        { name: 'Open examples', detail: 'Browse C++ graphics examples', shortcut: '', icon: BookOpen, action: () => setDialog('examples') },
         { name: 'Find in editor', detail: 'Search and replace in the active file', shortcut: 'Ctrl F', icon: Search, action: () => { setMobileView('editor'); updateLayout({ mode: 'split' }); setSearchToken(previous => previous + 1); } },
-        { name: 'Export project', detail: 'Save a portable backup', shortcut: 'Ctrl S', icon: Download, action: exportProject },
+        { name: 'Export project', detail: 'Download a .glstudio.json file', shortcut: 'Ctrl S', icon: Download, action: exportProject },
         { name: 'Import project', detail: 'Open a .glstudio.json file', shortcut: '', icon: Upload, action: () => importInput.current?.click() },
         { name: 'Toggle sidebar', detail: 'Show or hide the explorer', shortcut: 'Ctrl B', icon: PanelLeftOpen, action: () => updateLayout({ sidebar: !workspace.layout.sidebar }) },
         { name: 'Toggle terminal', detail: 'Show or hide build output', shortcut: 'Ctrl J', icon: PanelBottom, action: () => updateLayout({ terminal: !workspace.layout.terminal }) },
@@ -335,7 +336,11 @@ export default function App() {
             <IconButton label={`Rename or delete ${file.path}`} onClick={() => openFileDialog(file.path)}><Ellipsis size={15} /></IconButton>
         </div>);
     }
-    const statusText = compiling ? 'Compiling' : stdin.waiting ? 'Waiting for input' : runtimeStatus === 'loading' ? 'Starting' : runtimeStatus === 'running' ? 'Running' : runtimeStatus === 'paused' ? 'Paused' : runtimeStatus === 'error' ? 'Needs attention' : runtimeStatus === 'stopped' ? 'Stopped' : 'Ready to run';
+    const runtimeLabels = {
+        idle: 'Ready to run', loading: 'Starting', running: 'Running', paused: 'Paused',
+        error: artifact ? 'Program error' : 'Build failed', stopped: 'Stopped',
+    };
+    const statusText = compiling ? 'Compiling' : stdin.waiting ? 'Waiting for input' : runtimeLabels[runtimeStatus];
     const visibleLogs = logSearch ? logs.filter(log => log.text.toLowerCase().includes(logSearch.toLowerCase())) : logs;
 
     return <div className={`studio-app ${workspace.layout.sidebar ? '' : 'sidebar-hidden'} mobile-${mobileView}`}>
@@ -346,7 +351,7 @@ export default function App() {
                 <div className="menu-anchor"><button className={`text-button ${menu === 'view' ? 'selected' : ''}`} onClick={() => setMenu(menu === 'view' ? null : 'view')} aria-expanded={menu === 'view'}>View<ChevronDown size={11} /></button>{menu === 'view' && <div className="dropdown"><button onClick={() => { updateLayout({ mode: 'split' }); setMenu(null); }}><LayoutPanelLeft size={15} />Split workspace</button><button onClick={() => { updateLayout({ mode: 'editor' }); setMobileView('editor'); setMenu(null); }}><Code2 size={15} />Editor only</button><button onClick={() => { updateLayout({ mode: 'output' }); setMobileView('output'); setMenu(null); }}><Monitor size={15} />Output only</button><div className="menu-divider" /><button onClick={() => { updateLayout({ ...defaultLayout }); setMenu(null); }}><RotateCcw size={15} />Reset layout</button><button onClick={() => { setDialog('settings'); setMenu(null); }}><Settings2 size={15} />Settings</button></div>}</div>
             </div>
             <button className="command-trigger" onClick={() => { setCommandSearch(''); setDialog('commands'); }}><Search size={13} /><span>Search commands…</span><kbd>Ctrl Shift P</kbd></button>
-            <div className="top-actions"><span className="local-label"><span />Local workspace</span><IconButton label="Toggle terminal (Ctrl+J)" active={workspace.layout.terminal} onClick={() => updateLayout({ terminal: !workspace.layout.terminal })}><PanelBottom size={17} /></IconButton><IconButton label="Settings" onClick={() => setDialog('settings')}><Settings2 size={17} /></IconButton></div>
+            <div className="top-actions"><IconButton label="Toggle terminal (Ctrl+J)" active={workspace.layout.terminal} onClick={() => updateLayout({ terminal: !workspace.layout.terminal })}><PanelBottom size={17} /></IconButton><IconButton label="Settings" onClick={() => setDialog('settings')}><Settings2 size={17} /></IconButton></div>
         </header>
 
         <div className="app-body">
@@ -359,7 +364,7 @@ export default function App() {
                 <div className="file-tree">{fileEntries}</div>
                 <button className="add-file" onClick={() => openFileDialog()}><Plus size={13} />New file</button>
                 <div className="sidebar-bottom">
-                    <button className="sidebar-resource" onClick={() => setDialog('examples')}><BookOpen size={15} /><span>Explore examples</span><ArrowRight size={13} /></button>
+                    <button className="sidebar-resource" onClick={() => setDialog('examples')}><BookOpen size={15} /><span>Examples</span><ArrowRight size={13} /></button>
                     <button className="sidebar-resource" onClick={() => setDialog('help')}><CircleHelp size={15} /><span>Help & shortcuts</span><ChevronRight size={13} /></button>
                     <div className="sidebar-environment"><span className="small-dot" />C++17<span>OpenGL / GLUT</span></div>
                 </div>
@@ -377,28 +382,133 @@ export default function App() {
                     <ResizeHandle orientation="vertical" value={workspace.layout.split} min={28} max={75} container={workspaceArea} onChange={split => updateLayout({ split })} />
                     <section className="output-panel" ref={outputPanel} aria-label="Graphical output" aria-describedby="canvas-input-hint">
                         <span id="canvas-input-hint" className="visually-hidden">Click the canvas to focus it before using keyboard and mouse controls.</span>
-                        <div className="output-heading"><div title="Click the canvas to focus it before using keyboard and mouse controls."><Monitor size={14} /><span>OUTPUT</span><span className="webgl-badge">WebGL</span></div><div><IconButton label="Capture screenshot" disabled={!artifact || !active} onClick={() => viewport.current?.capture()}><Download size={14} /></IconButton><IconButton label="Fullscreen output" onClick={() => void fullscreen()}><Expand size={14} /></IconButton></div></div>
-                        <div className="output-status"><span className={`runtime-indicator ${runtimeStatus} ${compiling ? 'building' : ''}`} /><span>{statusText}</span>{sourceChanged && <span className="changed-source" title="The viewport shows the last successful build">Source modified</span>}<div className="output-controls"><IconButton label={paused ? 'Resume animation callbacks' : 'Pause animation callbacks'} disabled={!artifact || !active || stdin.waiting} active={paused} onClick={() => setPaused(previous => !previous)}>{paused ? <Play size={12} /> : <Pause size={12} />}</IconButton><IconButton label="Restart last successful build" disabled={!artifact} onClick={() => { setRunKey(previous => previous + 1); setPaused(false); }}><RotateCcw size={13} /></IconButton><IconButton label="Stop runtime" disabled={!artifact} onClick={stop}><Square size={11} /></IconButton></div></div>
+                        <div className="output-heading">
+                            <div><Monitor size={14} /><span>OUTPUT</span></div>
+                            <div>
+                                <IconButton label="Capture screenshot" disabled={!artifact || !active} onClick={() => viewport.current?.capture()}><Download size={14} /></IconButton>
+                                <IconButton label="Fullscreen output" onClick={() => void fullscreen()}><Expand size={14} /></IconButton>
+                            </div>
+                        </div>
+                        <div className="output-status">
+                            <span className={`runtime-indicator ${runtimeStatus} ${compiling ? 'building' : ''}`} /><span role="status">{statusText}</span>
+                            {sourceChanged && <span className="changed-source" title="Run code to apply your edits">Source modified</span>}
+                            <div className="output-controls">
+                                <IconButton label={paused ? 'Resume animation' : 'Pause animation'} disabled={!artifact || !active || stdin.waiting} active={paused} onClick={() => setPaused(previous => !previous)}>{paused ? <Play size={12} /> : <Pause size={12} />}</IconButton>
+                                <IconButton label="Restart program" disabled={!artifact} onClick={() => { setRunKey(previous => previous + 1); setPaused(false); }}><RotateCcw size={13} /></IconButton>
+                                <IconButton label="Stop program" disabled={!artifact} onClick={stop}><Square size={11} /></IconButton>
+                            </div>
+                        </div>
                         <div className="viewport-container"><Viewport ref={viewport} artifact={artifact} runKey={runKey} paused={paused} onLog={pushLog} onStatus={handleRuntimeStatus} onMetrics={setMetrics} onStdin={handleStdin} /></div>
-                        <div className="viewport-footer" aria-label="Canvas metrics"><span aria-label="Canvas size" title="Drawing buffer size in pixels">{metrics.width && artifact ? `${metrics.width} × ${metrics.height}` : '— × —'}</span><span aria-label="Frame rate">{active && metrics.fps > 0 ? `${Math.round(metrics.fps)} FPS` : '— FPS'}</span></div>
+                        {artifact && metrics.width > 0 && <div className="viewport-footer" aria-label="Canvas metrics">
+                            <span aria-label="Canvas size" title="Drawing buffer size in pixels">{metrics.width} × {metrics.height}</span>
+                            {runtimeStatus === 'running' && metrics.fps > 0 && <span aria-label="Frame rate">{Math.round(metrics.fps)} FPS</span>}
+                        </div>}
                     </section>
                 </div>
                 {workspace.layout.terminal && <><ResizeHandle orientation="horizontal" value={workspace.layout.panelHeight} min={120} max={400} container={workspaceArea} onChange={panelHeight => updateLayout({ panelHeight })} /><section className="terminal-panel" style={{ height: workspace.layout.panelHeight }} aria-label="Build output and problems"><div className="terminal-heading"><div className="panel-tabs" role="tablist"><button role="tab" aria-selected={terminalTab === 'output'} className={terminalTab === 'output' ? 'active' : ''} onClick={() => setTerminalTab('output')}><Terminal size={13} />TERMINAL</button><button role="tab" aria-selected={terminalTab === 'problems'} className={terminalTab === 'problems' ? 'active' : ''} onClick={() => setTerminalTab('problems')}>PROBLEMS{diagnostics.length > 0 && <span className="count-badge">{diagnostics.length}</span>}</button></div><div className="terminal-actions"><label className="log-search"><Search size={12} /><input aria-label="Filter output" value={logSearch} onChange={event => setLogSearch(event.target.value)} placeholder="Filter output" /></label><IconButton label={autoscroll ? 'Disable autoscroll' : 'Enable autoscroll'} active={autoscroll} onClick={() => setAutoscroll(previous => !previous)}><ArrowDownToLine size={14} /></IconButton><IconButton label="Copy output" onClick={() => void navigator.clipboard.writeText(logs.map(log => log.text).join('\n')).then(() => notify('Output copied.', 'success')).catch(() => notify('Clipboard access is unavailable.', 'error'))}><Copy size={13} /></IconButton><IconButton label="Clear output" onClick={() => { logQueue.current = []; setLogs([]); }}><Trash2 size={13} /></IconButton><IconButton label="Hide terminal" onClick={() => updateLayout({ terminal: false })}><X size={14} /></IconButton></div></div>
-                            {terminalTab === 'output' ? <div className="terminal-body" tabIndex={0} aria-label="Compiler and runtime output"><div className="terminal-intro"><span>GL STUDIO</span><span>Build & runtime output</span>{lastBuild && <span className={lastBuild.ok ? 'log-success' : 'log-error'}>{lastBuild.ok ? '✓ Build successful' : '× Build failed'} · {(lastBuild.duration / 1000).toFixed(2)}s</span>}</div>{visibleLogs.length ? visibleLogs.map(log => <div className={`log-line log-${log.level}`} key={log.id}><span className="log-time">{log.time || 'ready'}</span><span className="log-text">{log.text}</span></div>) : <div className="empty-log">{logSearch ? 'No output matches your filter.' : 'Output cleared. New build and runtime messages will appear here.'}</div>}<div ref={logEnd} /></div> : <div className="problems-body">{diagnostics.length ? diagnostics.map((diagnostic, index) => <button className={`diagnostic-row ${diagnostic.severity}`} key={`${diagnostic.file}:${diagnostic.line}:${index}`} onClick={() => goToDiagnostic(diagnostic)}>{diagnostic.severity === 'error' ? <CircleX size={15} /> : <CircleAlert size={15} />}<span>{diagnostic.message}<small>{diagnostic.file} · Ln {diagnostic.line}, Col {diagnostic.column}</small></span><ChevronRight size={14} /></button>) : <div className="empty-problems"><CircleCheck size={20} /><div>No problems to show.<small>Compiler diagnostics appear here after you run your project.</small></div></div>}</div>}
+                            {terminalTab === 'output' ? <div className="terminal-body" tabIndex={0} aria-label="Compiler and runtime output">
+                                {visibleLogs.length ? visibleLogs.map(log => <div className={`log-line log-${log.level}`} key={log.id}>
+                                    <span className="log-time">{log.time}</span><span className="log-text">{log.text}</span>
+                                </div>) : <div className="empty-log">{logSearch ? 'No matching output' : 'No output'}</div>}
+                                <div ref={logEnd} />
+                            </div> : <div className="problems-body">
+                                {diagnostics.length ? diagnostics.map((diagnostic, index) => <button className={`diagnostic-row ${diagnostic.severity}`} key={`${diagnostic.file}:${diagnostic.line}:${index}`} onClick={() => goToDiagnostic(diagnostic)}>
+                                    {diagnostic.severity === 'error' ? <CircleX size={15} /> : <CircleAlert size={15} />}
+                                    <span>{diagnostic.message}<small>{diagnostic.file} · Ln {diagnostic.line}, Col {diagnostic.column}</small></span><ChevronRight size={14} />
+                                </button>) : <div className="empty-log">No problems</div>}
+                            </div>}
                             <ProgramInput state={stdin} active={active} onSend={sendInput} />
                         </section></>}
             </main>
         </div>
 
-        <footer className="statusbar"><div><span className="status-brand"><LogoMark size={17} /></span><button className="status-item compiler-status" onClick={() => void refreshHealth()} title={health?.message}>{healthLoading ? <LoaderCircle size={12} className="spin" /> : <span className={`compiler-dot ${health?.available ? 'available' : ''}`} />}<span>{healthLoading ? 'Connecting to compiler' : health?.available ? 'Compiler connected' : 'Compiler unavailable'}</span></button><button className="status-item" onClick={() => { updateLayout({ terminal: true }); setTerminalTab('problems'); }}><CircleX size={12} />{errors}<CircleAlert size={12} />{warnings}</button><span className={`status-item saved-state ${saveState === 'error' ? 'save-error' : ''}`} title="Saved in this browser only. Export your project for a backup.">{saveState === 'saved' ? <Check size={12} /> : saveState === 'saving' ? <Circle size={9} /> : <CircleAlert size={12} />}{saveState === 'saved' ? 'Saved locally' : saveState === 'saving' ? 'Saving…' : 'Export to save'}</span></div><div><span className="status-item cursor-status">Ln {cursor.line}, Col {cursor.column}</span><button className="status-item settings-status" onClick={() => setDialog('settings')}>Spaces: {workspace.settings.tabSize}</button><span className="status-item language-status">UTF-8</span><span className="status-item language-status">C++17</span><button className="status-item trusted-status" onClick={() => setDialog('help')}><span className="small-dot" />{health?.mode === 'cloud-sandbox' ? 'Cloud compiler' : 'Trusted local mode'}</button></div></footer>
+        <footer className="statusbar">
+            <div>
+                <button className="status-item compiler-status" onClick={() => void refreshHealth()} title={(!health?.available && health?.message) || 'Check compiler connection'}>
+                    {healthLoading ? <LoaderCircle size={12} className="spin" /> : <span className={`compiler-dot ${health?.available ? 'available' : ''}`} />}
+                    <span>{healthLoading ? 'Connecting to compiler' : health?.available ? 'Compiler connected' : 'Compiler unavailable'}</span>
+                </button>
+                <button className="status-item" aria-label={`${errors} errors, ${warnings} warnings`} onClick={() => { updateLayout({ terminal: true }); setTerminalTab('problems'); }}><CircleX size={12} />{errors}<CircleAlert size={12} />{warnings}</button>
+                <span className={`status-item saved-state ${saveState === 'error' ? 'save-error' : ''}`} title="Export your project to save a copy outside this browser.">
+                    {saveState === 'saved' ? <Check size={12} /> : saveState === 'saving' ? <Circle size={9} /> : <CircleAlert size={12} />}{saveState === 'saved' ? 'Saved locally' : saveState === 'saving' ? 'Saving…' : 'Export to save'}
+                </span>
+            </div>
+            <div>
+                <span className="status-item cursor-status">Ln {cursor.line}, Col {cursor.column}</span>
+                <button className="status-item settings-status" onClick={() => setDialog('settings')}>Spaces: {workspace.settings.tabSize}</button>
+                <span className="status-item language-status">UTF-8</span><span className="status-item language-status">C++17</span>
+            </div>
+        </footer>
 
         <input ref={importInput} type="file" accept=".json,.glstudio.json" className="visually-hidden" aria-label="Import project file" onChange={event => { const file = event.target.files?.[0]; if (file) void importProject(file); event.target.value = ''; }} />
         {toast && <div className={`toast ${toast.tone}`} role={toast.tone === 'error' ? 'alert' : 'status'}>{toast.tone === 'error' ? <CircleAlert size={17} /> : toast.tone === 'success' ? <CircleCheck size={17} /> : <CircleHelp size={17} />}<span>{toast.message}</span><IconButton label="Dismiss notification" onClick={() => setToast(null)}><X size={14} /></IconButton></div>}
 
-        {dialog === 'settings' && <Modal title="Make it your workspace" onClose={() => setDialog(null)}><p className="dialog-description">A few small preferences for a more comfortable flow.</p><div className="setting-section"><h3>Appearance</h3><div className="theme-options">{([{ id: 'dark', label: 'Dark', icon: Moon }, { id: 'light', label: 'Light', icon: Sun }, { id: 'system', label: 'System', icon: Monitor }] as const).map(option => <button key={option.id} className={workspace.settings.theme === option.id ? 'selected' : ''} onClick={() => updateSettings({ theme: option.id })}><option.icon size={20} /><span>{option.label}</span>{workspace.settings.theme === option.id && <Check size={13} />}</button>)}</div></div><div className="setting-section"><h3>Editor</h3><label className="setting-row"><span>Font size<small>Keep your code easy to read.</small></span><select value={workspace.settings.fontSize} onChange={event => updateSettings({ fontSize: Number(event.target.value) })}>{[11, 12, 13, 14, 15, 16, 18, 20, 24].map(size => <option key={size} value={size}>{size}px</option>)}</select></label><label className="setting-row"><span>Indentation<small>Spaces per tab.</small></span><select value={workspace.settings.tabSize} onChange={event => updateSettings({ tabSize: Number(event.target.value) })}>{[2, 4, 8].map(size => <option key={size} value={size}>{size} spaces</option>)}</select></label><label className="setting-row"><span>Word wrap<small>Wrap long lines to fit the editor.</small></span><input type="checkbox" checked={workspace.settings.wordWrap} onChange={event => updateSettings({ wordWrap: event.target.checked })} /></label><label className="setting-row"><span>Minimap<small>A bird’s-eye view of your source.</small></span><input type="checkbox" checked={workspace.settings.minimap} onChange={event => updateSettings({ minimap: event.target.checked })} /></label></div><div className="setting-section"><h3>Workspace</h3><p className="setting-note">Autosave stays in this browser. It is not cloud storage or a backup.</p><div className="setting-actions"><RaisedButton size="sm" className="secondary-button" onClick={exportProject}><Download size={14} />Export project</RaisedButton><RaisedButton size="sm" className="secondary-button" onClick={() => updateLayout({ ...defaultLayout })}><LayoutPanelLeft size={14} />Reset layout</RaisedButton></div>{persistenceBlocked && <button className="text-link" onClick={() => { setPersistenceBlocked(false); notify('Local saving has been re-enabled.'); }}>Resume saving this version locally</button>}</div></Modal>}
-        {dialog === 'examples' && <Modal title="Small programs. Big ideas." onClose={() => setDialog(null)} className="examples-dialog"><p className="dialog-description">Start with working C++ and make something your own. Opening an example replaces your current project.</p><div className="example-cards">{examples.map((example, index) => <button className="example-card" key={example.id} onClick={() => loadExample(example)}><div className={`example-art art-${example.id}`} aria-hidden="true">{index === 0 ? <span className="mini-triangle" /> : index === 1 ? <span className="mini-lines"><i /><i /></span> : <span className="mini-orbit"><i /></span>}</div><div><span className="example-tag">{example.tag}</span><h3>{example.name}</h3><p>{example.description}</p><span className="example-open">Open project<ArrowRight size={14} /></span></div></button>)}</div><p className="example-note"><FileCode2 size={14} />Every example compiles from real C++ into WebAssembly.</p></Modal>}
-        {dialog === 'commands' && <Modal title="Command palette" onClose={() => setDialog(null)} className="command-dialog"><div className="command-input"><Search size={17} /><input autoFocus value={commandSearch} onChange={event => setCommandSearch(event.target.value)} placeholder="What would you like to do?" aria-label="Search commands" /></div><div className="command-list">{commands.filter(command => `${command.name} ${command.detail}`.toLowerCase().includes(commandSearch.toLowerCase())).map(command => <button key={command.name} onClick={() => { setDialog(null); command.action(); }}><command.icon size={17} /><span>{command.name}<small>{command.detail}</small></span>{command.shortcut && <kbd>{command.shortcut}</kbd>}</button>)}</div><div className="command-footer"><span>Use Tab to navigate · Enter to select</span><span>Esc to close</span></div></Modal>}
+        {dialog === 'settings' && <Modal title="Settings" onClose={() => setDialog(null)}>
+            <div className="setting-section">
+                <h3>Appearance</h3>
+                <div className="theme-options">
+                    {([{ id: 'dark', label: 'Dark', icon: Moon }, { id: 'light', label: 'Light', icon: Sun }, { id: 'system', label: 'System', icon: Monitor }] as const).map(option => <button key={option.id} className={workspace.settings.theme === option.id ? 'selected' : ''} onClick={() => updateSettings({ theme: option.id })}>
+                        <option.icon size={20} /><span>{option.label}</span>{workspace.settings.theme === option.id && <Check size={13} />}
+                    </button>)}
+                </div>
+            </div>
+            <div className="setting-section">
+                <h3>Editor</h3>
+                <label className="setting-row">Font size<select value={workspace.settings.fontSize} onChange={event => updateSettings({ fontSize: Number(event.target.value) })}>
+                    {[11, 12, 13, 14, 15, 16, 18, 20, 24].map(size => <option key={size} value={size}>{size}px</option>)}
+                </select></label>
+                <label className="setting-row">Indentation<select value={workspace.settings.tabSize} onChange={event => updateSettings({ tabSize: Number(event.target.value) })}>
+                    {[2, 4, 8].map(size => <option key={size} value={size}>{size} spaces</option>)}
+                </select></label>
+                <label className="setting-row">Word wrap<input type="checkbox" checked={workspace.settings.wordWrap} onChange={event => updateSettings({ wordWrap: event.target.checked })} /></label>
+                <label className="setting-row">Minimap<input type="checkbox" checked={workspace.settings.minimap} onChange={event => updateSettings({ minimap: event.target.checked })} /></label>
+            </div>
+            <div className="setting-section">
+                <h3>Workspace</h3>
+                <p className="setting-note">Projects autosave in this browser. Export a project to keep a backup.</p>
+                <div className="setting-actions">
+                    <RaisedButton size="sm" className="secondary-button" onClick={exportProject}><Download size={14} />Export project</RaisedButton>
+                    <RaisedButton size="sm" className="secondary-button" onClick={() => updateLayout({ ...defaultLayout })}><LayoutPanelLeft size={14} />Reset layout</RaisedButton>
+                </div>
+                {persistenceBlocked && <button className="text-link" onClick={() => setPersistenceBlocked(false)}>Resume autosave</button>}
+            </div>
+        </Modal>}
+        {dialog === 'examples' && <Modal title="Examples" onClose={() => setDialog(null)} className="examples-dialog">
+            <p className="dialog-description">Opening an example replaces your current project.</p>
+            <div className="example-cards">
+                {examples.map((example, index) => <button className="example-card" key={example.id} onClick={() => loadExample(example)}>
+                    <div className={`example-art art-${example.id}`} aria-hidden="true">{index === 0 ? <span className="mini-triangle" /> : index === 1 ? <span className="mini-lines"><i /><i /></span> : <span className="mini-orbit"><i /></span>}</div>
+                    <div><h3>{example.name}</h3><p>{example.description}</p></div>
+                </button>)}
+            </div>
+        </Modal>}
+        {dialog === 'commands' && <Modal title="Command palette" onClose={() => setDialog(null)} className="command-dialog"><div className="command-input"><Search size={17} /><input autoFocus value={commandSearch} onChange={event => setCommandSearch(event.target.value)} placeholder="Search commands" aria-label="Search commands" /></div><div className="command-list">{commands.filter(command => `${command.name} ${command.detail}`.toLowerCase().includes(commandSearch.toLowerCase())).map(command => <button key={command.name} onClick={() => { setDialog(null); command.action(); }}><command.icon size={17} /><span>{command.name}<small>{command.detail}</small></span>{command.shortcut && <kbd>{command.shortcut}</kbd>}</button>)}</div><div className="command-footer"><span>Use Tab to navigate · Enter to select</span><span>Esc to close</span></div></Modal>}
         {dialog === 'file' && <Modal title={renameFrom ? 'File settings' : 'Create a file'} onClose={() => setDialog(null)} className="file-dialog"><form onSubmit={event => { event.preventDefault(); submitFile(); }}><p className="dialog-description">Use a folder path to organize your files, such as <code>include/shapes.h</code>.</p><label className="field-label" htmlFor="file-path">File path</label><input id="file-path" className="text-input" autoFocus value={fileName} onChange={event => { setFileName(event.target.value); setFileError(''); }} placeholder="main.cpp" aria-invalid={Boolean(fileError)} aria-describedby={fileError ? 'file-error' : undefined} />{fileError && <p id="file-error" className="field-error">{fileError}</p>}<div className="dialog-actions">{renameFrom && <button className="danger-text" type="button" onClick={deleteFile} disabled={workspace.files.length <= 1}><Trash2 size={14} />Delete file</button>}<span /><RaisedButton size="sm" className="secondary-button" type="button" onClick={() => setDialog(null)}>Cancel</RaisedButton><RaisedButton size="sm" color="#0b70df" className="primary-button" type="submit">{renameFrom ? 'Save filename' : 'Create file'}</RaisedButton></div></form></Modal>}
-        {dialog === 'help' && <Modal title="A workspace for graphics, with clear limits" onClose={() => setDialog(null)} className="help-dialog"><p className="dialog-description">GL Studio compiles C++ with Emscripten and runs the result in a dedicated browser worker.</p><div className="help-block"><h3><Check size={16} />The supported starting point</h3><p>One canvas, immediate-mode primitives, colors and matrix transforms, display and reshape callbacks, timers, and keyboard/mouse input. Click the canvas to focus it before using keyboard or mouse controls. Try the examples before adapting a desktop assignment.</p></div><div className="help-block"><h3><CircleAlert size={16} />Desktop GLUT is not browser GLUT</h3><p>Native windows, multiple windows, GLUT menus and fonts, arbitrary system libraries and desktop-specific APIs are outside this preview. Some legacy OpenGL operations are not emulated. Unsupported calls may fail compilation or report a runtime error.</p><p>Pause suspends adapter callbacks; Stop terminates the runtime worker. The terminal accepts line-based program input for cin, getline and scanf. Enter submits a line; EOF closes stdin. It is not a system shell. Syntax coloring and compiler diagnostics are available; full C++ IntelliSense is not.</p></div><div className="help-block local-warning"><h3><Monitor size={16} />{health?.mode === 'cloud-sandbox' ? 'Isolated cloud compilation' : 'Trusted local compilation'}</h3><p>{health?.mode === 'cloud-sandbox' ? 'Each build uses a fresh compiler VM with network access blocked. The VM is stopped after the build; source files stay local in your browser between builds. Access to this deployment is managed by Vercel.' : 'The native compiler runs on your computer without a hardened server sandbox. Compile only source you trust. This development service must remain bound to localhost and must not be exposed to public submissions.'}</p><p>{health?.message}</p>{health?.version && <code>{health.version}</code>}</div><div className="help-shortcuts"><h3>Useful shortcuts</h3><div><span>Run project</span><kbd>Ctrl / ⌘ + Enter</kbd></div><div><span>Command palette</span><kbd>Ctrl / ⌘ + Shift + P</kbd></div><div><span>Toggle explorer</span><kbd>Ctrl / ⌘ + B</kbd></div><div><span>Toggle output panel</span><kbd>Ctrl / ⌘ + J</kbd></div><div><span>Export project backup</span><kbd>Ctrl / ⌘ + S</kbd></div><div><span>Find / replace in editor</span><kbd>Ctrl / ⌘ + F / H</kbd></div><p>In Monaco, Ctrl+M toggles whether Tab moves focus out of the editor.</p></div></Modal>}
+        {dialog === 'help' && <Modal title="Help & shortcuts" onClose={() => setDialog(null)} className="help-dialog">
+            <div className="help-block">
+                <h3>Graphics output</h3>
+                <p>GLStudio supports one GLUT window. Set its resolution with <code>glutInitWindowSize</code>. The preview scales to fit the panel.</p>
+                <p>Click the canvas to use your program’s keyboard and mouse controls.</p>
+                <p>Win32 calls, multiple windows, and GLUT menus require a desktop build. Some legacy OpenGL calls may also be unsupported.</p>
+            </div>
+            <div className="help-block">
+                <h3>Program input</h3>
+                <p>The terminal enables input when your program reads from <code>stdin</code>. Press Enter to send a line or EOF to close input.</p>
+            </div>
+            {health?.mode === 'trusted-local' && <div className="help-block local-warning">
+                <h3><CircleAlert size={16} />Local compiler</h3>
+                <p>Compile only source you trust. Keep the development compiler on localhost.</p>
+            </div>}
+            <div className="help-shortcuts">
+                <h3>Keyboard shortcuts</h3>
+                <div><span>Run code</span><kbd>Ctrl / ⌘ + Enter</kbd></div>
+                <div><span>Command palette</span><kbd>Ctrl / ⌘ + Shift + P</kbd></div>
+                <div><span>Toggle sidebar</span><kbd>Ctrl / ⌘ + B</kbd></div>
+                <div><span>Toggle terminal</span><kbd>Ctrl / ⌘ + J</kbd></div>
+                <div><span>Export project</span><kbd>Ctrl / ⌘ + S</kbd></div>
+                <div><span>Find / replace</span><kbd>Ctrl / ⌘ + F / H</kbd></div>
+                <p>Press Ctrl+M in the editor to let Tab move focus out.</p>
+            </div>
+        </Modal>}
     </div>;
 }

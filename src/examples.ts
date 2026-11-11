@@ -1,9 +1,8 @@
 import type { SourceFile } from '../shared/contracts';
 
-export interface Example { id: string; name: string; description: string; tag: string; files: SourceFile[] }
+export interface Example { id: string; name: string; description: string; files: SourceFile[] }
 
-const triangle = `// Welcome to GL Studio. Your canvas starts with C++.
-// Run with Ctrl+Enter. Edit the vertices and try again.
+const triangle = `// Draw a triangle with a color at each vertex.
 #include <GL/glut.h>
 
 void display() {
@@ -40,7 +39,7 @@ int main(int argc, char** argv) {
     glutInit(&argc, argv);
     glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGB);
     glutInitWindowSize(640, 480);
-    glutCreateWindow("My first triangle");
+    glutCreateWindow("Colored triangle");
     glClearColor(0.055f, 0.067f, 0.09f, 1.0f);
     glutDisplayFunc(display);
     glutReshapeFunc(reshape);
@@ -144,7 +143,7 @@ void reshape(int w, int h) {
 int main(int argc, char** argv) {
     glutInit(&argc, argv);
     glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGB);
-    glutCreateWindow("A little motion");
+    glutCreateWindow("Rotating triangle");
     glClearColor(0.055f, 0.067f, 0.09f, 1.0f);
     glutDisplayFunc(display);
     glutReshapeFunc(reshape);
@@ -156,7 +155,7 @@ int main(int argc, char** argv) {
 `;
 
 export const examples: Example[] = [
-    { id: 'triangle', name: 'Hello, triangle', description: 'Vertices, colors, and your first frame.', tag: 'GET STARTED', files: [{ path: 'main.cpp', content: triangle }] },
-    { id: 'dda', name: 'DDA line drawing', description: 'Explore a classic raster algorithm.', tag: 'ALGORITHMS', files: [{ path: 'main.cpp', content: dda }] },
-    { id: 'animation', name: 'A little motion', description: 'Timers, transforms, and keyboard input.', tag: 'ANIMATION', files: [{ path: 'main.cpp', content: animation }] },
+    { id: 'triangle', name: 'Colored triangle', description: 'Interpolate colors between three vertices.', files: [{ path: 'main.cpp', content: triangle }] },
+    { id: 'dda', name: 'DDA line drawing', description: 'Plot line segments one point at a time.', files: [{ path: 'main.cpp', content: dda }] },
+    { id: 'animation', name: 'Rotating triangle', description: 'Press Space to pause or resume rotation.', files: [{ path: 'main.cpp', content: animation }] },
 ];

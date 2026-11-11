@@ -2,7 +2,7 @@ import type { BuildResult, CompilerHealth, SourceFile } from '../shared/contract
 
 export async function checkCompiler(): Promise<CompilerHealth> {
   const response = await fetch('/api/health', { signal: AbortSignal.timeout(8_000) });
-  if (!response.ok) throw new Error('The local compiler service is not responding. Start it with npm run dev.');
+  if (!response.ok) throw new Error('Compiler unavailable.');
   return response.json() as Promise<CompilerHealth>;
 }
 
@@ -13,6 +13,9 @@ export async function compileProject(files: SourceFile[], signal?: AbortSignal):
     body: JSON.stringify({ files }), signal,
   });
   const result = await response.json().catch(() => null);
-  if (!response.ok) throw new Error(result?.error ?? result?.message ?? result?.logs ?? `Compilation request failed (${response.status}).`);
+  if (!response.ok) {
+    const message = [result?.message, result?.logs, result?.error].find(value => typeof value === 'string' && value.trim());
+    throw new Error(message ?? `Compilation request failed (${response.status}).`);
+  }
   return result as BuildResult;
 }

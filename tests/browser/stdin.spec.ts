@@ -77,7 +77,7 @@ test('scanf, UTF-8 getline, EOF and stopping an input wait work without blocking
   await page.getByRole('button', { name: 'Settings', exact: true }).first().click();
   await expect(page.getByRole('dialog')).toBeVisible();
   await page.getByRole('button', { name: 'Close dialog' }).click();
-  await page.getByRole('button', { name: 'Stop runtime', exact: true }).click();
+  await page.getByRole('button', { name: 'Stop program', exact: true }).click();
   await expect(page.locator('iframe')).toHaveCount(0);
   await expect(page.getByRole('textbox', { name: 'Program input', exact: true })).toBeDisabled();
 });

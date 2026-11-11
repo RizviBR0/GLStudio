@@ -17,9 +17,9 @@ All C++ execution and callbacks run inside a dedicated worker. A tight loop can 
 
 ## Intentional differences
 
-- The IDE owns the canvas dimensions. `glutInitWindowSize` stores a preferred size; `glutInitWindowPosition` has no browser effect. `glutReshapeWindow` reports a warning and does not resize the IDE. Drag the viewport divider instead.
-- Reshape and pointer coordinates use drawing-buffer pixels. The embedding UI converts CSS pointer coordinates, caps DPR at 2, and preserves aspect ratio while limiting the canvas to 2048 pixels per axis.
-- An absent reshape callback produces a default `glViewport` update. A supplied reshape callback owns its projection and viewport updates.
+- `glutInitWindowSize` sets the drawing buffer size. The default is 640 × 480. Requests above 2048 pixels on either axis are scaled down proportionally. `glutInitWindowPosition` has no browser effect, and `glutReshapeWindow` reports a warning.
+- Resizing the IDE or entering fullscreen centers and scales the preview to fit. The drawing buffer stays fixed at the GLUT window size, so screenshots retain that resolution.
+- The runtime initializes `glViewport` and calls a registered reshape callback when the main loop starts. Reshape and mouse coordinates use drawing-buffer pixels. The preview maps pointer coordinates from its displayed canvas bounds.
 - `glutSwapBuffers` is a compatibility no-op; the browser presents after the rendering callback. Single/double buffering is not native desktop swap control.
 - Display callbacks run on demand. Idle callbacks run at most once per animation tick. Timer callbacks run on the first animation tick after their deadline; this is not a real-time timer.
 - Pause suspends GLUT display, idle, timer and input callbacks. It freezes the adapter's elapsed time and timer deadlines. It cannot suspend arbitrary computation already executing. Stop terminates the worker.

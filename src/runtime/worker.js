@@ -7,7 +7,6 @@ let logBytes = 0;
 let windowBytes = 0;
 let windowStart = performance.now();
 let suppressed = false;
-let pendingResize = null;
 let inputBytes = new Uint8Array(0);
 let inputEnded = false;
 let inputRequestId = 0;
@@ -34,7 +33,7 @@ function log(level, value) {
   if (logBytes + bytes > MAX_TOTAL_LOG_BYTES || windowBytes + bytes > MAX_WINDOW_LOG_BYTES) {
     if (!suppressed) {
       suppressed = true;
-      send({ type: 'log', level: 'warning', text: 'Output limit reached. Further output may be suppressed; restart to reset the limit.' });
+      send({ type: 'log', level: 'warning', text: 'Output truncated.' });
     }
     return;
   }
@@ -95,13 +94,6 @@ async function readInput(capacity) {
   }
 }
 
-function dimensions(width, height) {
-  if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) {
-    throw new Error('Invalid viewport dimensions.');
-  }
-  return [Math.max(1, Math.min(4096, Math.floor(width))), Math.max(1, Math.min(4096, Math.floor(height)))];
-}
-
 function runtimeEvent(event) {
   if (event.type === 'log') log(event.level, event.text);
   else if (event.type === 'metrics') send(event);
@@ -117,9 +109,6 @@ async function start(message) {
   if (!(message.canvas instanceof OffscreenCanvas)) throw new Error('This browser cannot provide the required worker graphics canvas.');
   if (typeof message.javascript !== 'string' || message.javascript.length > 8 * 1024 * 1024) throw new Error('Invalid program loader.');
   if (!(message.wasm instanceof ArrayBuffer) || message.wasm.byteLength > 32 * 1024 * 1024) throw new Error('Invalid WebAssembly artifact.');
-  const [width, height] = dimensions(message.width, message.height);
-  message.canvas.width = width;
-  message.canvas.height = height;
   const url = URL.createObjectURL(new Blob([message.javascript], { type: 'text/javascript' }));
   try {
     const module = await import(/* @vite-ignore */ url);
@@ -139,9 +128,7 @@ async function start(message) {
       glstudioEvent: runtimeEvent,
       glstudioReadInput: readInput,
     });
-    if (pendingResize) program.glstudio?.resize(...pendingResize);
-    send({ type: 'ready' });
-    send({ type: 'status', status: 'running', message: 'Starting program…' });
+    send({ type: 'status', status: 'running' });
     try {
       program.callMain([]);
       if (program.Asyncify.currData) await program.Asyncify.whenDone();
@@ -151,9 +138,7 @@ async function start(message) {
     if (!stopped && !program.glstudio?.isActive()) {
       flushOutput();
       stopped = true;
-      send({ type: 'status', status: 'stopped', message: program.glstudio?.hasWindow()
-        ? 'Program finished. Register a display callback and call glutMainLoop to keep rendering.'
-        : 'Program finished without creating a GLUT window.' });
+      send({ type: 'status', status: 'stopped', message: 'Program exited.' });
     }
   } finally {
     URL.revokeObjectURL(url);
@@ -190,10 +175,7 @@ self.addEventListener('message', async ({ data: message }) => {
       pending.resolve();
       return;
     }
-    if (message.type === 'resize') {
-      pendingResize = dimensions(message.width, message.height);
-      if (!stopped) program?.glstudio?.resize(...pendingResize);
-    } else if (message.type === 'input' && !stopped) {
+    if (message.type === 'input' && !stopped) {
       const event = message.event;
       if (!event || !['keydown', 'keyup', 'mousedown', 'mouseup', 'mousemove', 'wheel', 'blur'].includes(event.kind)) return;
       program?.glstudio?.input({

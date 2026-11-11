@@ -10,8 +10,9 @@ for (var key of Object.keys(LibraryManager.library)) {
 }
 addToLibrary({
   $GLStudio__deps: ['$GL', '$Browser', '$getWasmTableEntry', '$UTF8ToString', '$Asyncify'],
+  // Keep the resize entry point for open IDE tabs that still send pane sizes.
   $GLStudio__postset: `Module['glstudio'] = {
-    'resize': (width, height) => GLStudio.resize(width, height),
+    'resize': () => {},
     'input': (event) => GLStudio.input(event),
     'pause': (paused) => GLStudio.pause(paused),
     'capture': () => Module['canvas'].convertToBlob({type: 'image/png'}),
@@ -24,7 +25,7 @@ addToLibrary({
     display: 0, reshape: 0, idle: 0, keyboard: 0, keyboardUp: 0,
     special: 0, specialUp: 0, mouse: 0, motion: 0, passiveMotion: 0,
     dirty: true, modifiers: 0, mouseX: 0, mouseY: 0,
-    timers: [], heldKeys: {}, heldButtons: {}, callbacks: {}, pendingResize: null,
+    timers: [], heldKeys: {}, heldButtons: {}, callbacks: {},
     startedAt: 0, pausedAt: 0, pausedDuration: 0,
     frames: 0, metricsAt: 0, scheduled: null,
 
@@ -46,9 +47,14 @@ addToLibrary({
     },
     dimensions(width, height) {
       if (!Number.isFinite(width) || !Number.isFinite(height) || width < 1 || height < 1) {
-        throw new Error('Viewport dimensions must be positive finite numbers.');
+        throw new Error('GLUT window width and height must be positive.');
       }
-      return [Math.min(4096, Math.floor(width)), Math.min(4096, Math.floor(height))];
+      var scale = Math.min(1, 2048 / Math.max(width, height));
+      return [Math.max(1, Math.round(width * scale)), Math.max(1, Math.round(height * scale))];
+    },
+    reportMetrics(fps) {
+      var canvas = Module['canvas'];
+      GLStudio.emit({type: 'metrics', fps, width: canvas.width, height: canvas.height});
     },
     createWindow(title) {
       if (GLStudio.created) throw new Error('Only one GLUT window is supported.');
@@ -56,6 +62,8 @@ addToLibrary({
         throw new Error('Indexed color, accumulation, stereo and luminance GLUT display modes are unsupported.');
       }
       var canvas = Module['canvas'];
+      canvas.width = GLStudio.preferredWidth;
+      canvas.height = GLStudio.preferredHeight;
       var handle = GL.createContext(canvas, {
         majorVersion: 1, minorVersion: 0, alpha: !!(GLStudio.displayMode & 0x0008),
         depth: !!(GLStudio.displayMode & 0x0010), stencil: !!(GLStudio.displayMode & 0x0020),
@@ -73,6 +81,7 @@ addToLibrary({
       GLStudio.created = true;
       GLStudio.metricsAt = performance.now();
       Module['ctx'].viewport(0, 0, canvas.width, canvas.height);
+      GLStudio.reportMetrics(0);
       canvas.addEventListener('webglcontextlost', (event) => {
         event.preventDefault();
         GLStudio.fail('The graphics context was lost. Restart the program to recover.');
@@ -90,7 +99,6 @@ addToLibrary({
       if (!GLStudio.active || GLStudio.failed) return;
       try {
         if (!GLStudio.paused && !GLStudio.blocked()) {
-          if (GLStudio.pendingResize) { var size = GLStudio.pendingResize; GLStudio.pendingResize = null; GLStudio.resize(...size); }
           var now = GLStudio.clock();
           var due = GLStudio.timers.filter((timer) => timer.at <= now);
           GLStudio.timers = GLStudio.timers.filter((timer) => timer.at > now);
@@ -109,8 +117,7 @@ addToLibrary({
         }
         var realNow = performance.now();
         if (realNow - GLStudio.metricsAt >= 1000) {
-          var canvas = Module['canvas'];
-          GLStudio.emit({type: 'metrics', fps: Math.round(GLStudio.frames * 1000 / (realNow - GLStudio.metricsAt)), width: canvas.width, height: canvas.height});
+          GLStudio.reportMetrics(Math.round(GLStudio.frames * 1000 / (realNow - GLStudio.metricsAt)));
           GLStudio.frames = 0;
           GLStudio.metricsAt = realNow;
         }
@@ -119,18 +126,6 @@ addToLibrary({
         return;
       }
       GLStudio.schedule();
-    },
-    resize(width, height) {
-      var size = GLStudio.dimensions(width, height);
-      if (GLStudio.blocked()) { GLStudio.pendingResize = size; return; }
-      var canvas = Module['canvas'];
-      if (canvas.width === size[0] && canvas.height === size[1]) return;
-      canvas.width = size[0]; canvas.height = size[1];
-      if (GLStudio.created && !GLStudio.failed) {
-        if (GLStudio.reshape) GLStudio.call(GLStudio.reshape, size);
-        else Module['ctx'].viewport(0, 0, size[0], size[1]);
-      }
-      GLStudio.dirty = true;
     },
     resetInput() {
       for (var key of Object.keys(GLStudio.heldKeys)) {
@@ -260,7 +255,7 @@ addToLibrary({
   glutReshapeWindow__deps: ['$GLStudio'],
   glutReshapeWindow: (width, height) => {
     GLStudio.dimensions(width, height);
-    GLStudio.emit({type: 'log', level: 'warning', text: 'The IDE controls viewport size. Drag its divider to resize.'});
+    GLStudio.emit({type: 'log', level: 'warning', text: 'glutReshapeWindow is unsupported. Set the window size with glutInitWindowSize.'});
   },
   glutMainLoop__deps: ['$GLStudio'],
   glutMainLoop: () => {

@@ -17,7 +17,7 @@ export function ProgramInput({ state, active, onSend }: Props) {
     <span className="stdin-label" title="Standard input for the C++ program">stdin</span>
     <span className="stdin-prompt" aria-hidden="true">›</span>
     <input ref={input} aria-label="Program input" value={text} maxLength={8192} disabled={!state.waiting}
-      placeholder={state.waiting ? 'Type a value and press Enter…' : active ? 'Input opens when your program reads stdin' : 'Run a program to enter input'}
+      placeholder={state.waiting ? 'Type input and press Enter' : active ? 'No input requested' : 'No program running'}
       autoComplete="off" spellCheck={false} onChange={event => setText(event.target.value)}
       onKeyDown={event => { if (event.ctrlKey && event.key.toLowerCase() === 'd') { event.preventDefault(); event.stopPropagation(); submit(true); } }} />
     <button type="button" className="stdin-eof" disabled={!state.waiting} onClick={() => submit(true)} title="Close standard input (Ctrl+D)">EOF</button>

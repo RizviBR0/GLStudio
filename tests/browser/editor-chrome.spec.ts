@@ -34,7 +34,6 @@ test('Find and Replace loads its icon font and replaces text in both themes', as
   await expect(page.locator('.find-widget .codicon-widget-close')).toHaveCSS('font-family', 'codicon');
   await page.screenshot({ path: '.cache/find-replace-light.png' });
   await page.setViewportSize({ width: 800, height: 800 });
-  await expect(page.getByLabel('Canvas size', { exact: true })).toBeVisible();
-  await expect(page.getByLabel('Frame rate', { exact: true })).toBeVisible();
-  await expect(page.locator('.viewport-footer')).toHaveCSS('height', '24px');
+  await expect(page.getByRole('region', { name: 'Graphical output', exact: true })).toBeVisible();
+  await expect(page.locator('.viewport-footer')).toHaveCount(0);
 });
