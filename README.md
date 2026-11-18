@@ -26,7 +26,7 @@ The API binds to `127.0.0.1:3001`. Keep both services on localhost. This version
 - Compiler/runtime output with bounded buffers, filtering, copy, clear and autoscroll; interactive program input for `cin`, `getline` and `scanf`.
 - Dark, light and system themes, editor preferences, command palette, keyboard-accessible resize handles, and a mobile editor/output switch.
 - Local autosave with quota/corruption feedback and cross-tab conflict detection. Export projects for a backup; local browser storage can be cleared or evicted.
-- Triangle, DDA line drawing, and animated transformation examples.
+- Triangle, DDA line drawing, animated transformations, and 14 classroom examples covering 2D shapes, day/night, input, 3D cubes and object lighting.
 
 When a program asks for input, type into the **stdin** row at the bottom of the terminal and press **Enter**. You can enter several values on one line, such as `100 100`, for chained `cin` reads. **EOF** or **Ctrl+D** closes standard input. Run again to start a fresh input stream.
 

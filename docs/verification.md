@@ -33,3 +33,11 @@ Other OpenGL APIs remain subject to Emscripten's incomplete emulation and are no
 - Standard input uses an Asyncify-enabled `fd_read` bridge. Worker messages supply UTF-8 lines without weakening the iframe sandbox. Prompts flush before input requests, and suspended Wasm callbacks are protected against reentry.
 
 The native compiler is still a trusted local developer service. These checks do not establish suitability for public untrusted compilation.
+
+## Classroom compatibility — 18 November 2026
+
+All 14 supplied programs compile and render in Playwright Chromium through the actual editor, HTTP compiler API, Wasm worker and WebGL canvas. The original 13 attached files are preserved as text in `src/classroom-examples.json`; the additional pasted rectangle/pentagon example has transport escaping removed. Two extra lighting variants exercise cone and torus helpers. All 16 classroom checks pass, including day/night keyboard controls, the three-second automatic timer, rotation, movement, stop/resume keys and worker teardown.
+
+The fixes cover current color/normal attributes per vertex (the `numVertices` stride assertion), convex `GL_POLYGON` rendering, sphere/cone/torus geometry with normals, and the SDK matrix-library initialization cycle. `npm test` passes all 10 tests; TypeScript, production build and real multi-file compiler/diagnostic smoke checks pass.
+
+The complete browser regression suite passes all 28 tests after these fixes, including textured rendering, screenshot dimensions, editor persistence, standard input and the infinite-loop watchdog.

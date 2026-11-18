@@ -105,8 +105,12 @@ void glutPositionWindow(int, int) GLSTUDIO_UNSUPPORTED;
 void glutMainLoopEvent(void) GLSTUDIO_UNSUPPORTED;
 void glutBitmapCharacter(void *, int) GLSTUDIO_UNSUPPORTED;
 void glutStrokeCharacter(void *, int) GLSTUDIO_UNSUPPORTED;
-void glutSolidSphere(GLdouble, GLint, GLint) GLSTUDIO_UNSUPPORTED;
-void glutWireSphere(GLdouble, GLint, GLint) GLSTUDIO_UNSUPPORTED;
+void glutSolidSphere(GLdouble radius, GLint slices, GLint stacks);
+void glutWireSphere(GLdouble radius, GLint slices, GLint stacks);
+void glutSolidCone(GLdouble base, GLdouble height, GLint slices, GLint stacks);
+void glutWireCone(GLdouble base, GLdouble height, GLint slices, GLint stacks);
+void glutSolidTorus(GLdouble innerRadius, GLdouble outerRadius, GLint sides, GLint rings);
+void glutWireTorus(GLdouble innerRadius, GLdouble outerRadius, GLint sides, GLint rings);
 void glutSolidTeapot(GLdouble) GLSTUDIO_UNSUPPORTED;
 void glutWireTeapot(GLdouble) GLSTUDIO_UNSUPPORTED;
 

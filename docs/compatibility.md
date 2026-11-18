@@ -6,11 +6,13 @@ GL Studio compiles real C++ into WebAssembly using Emscripten. It uses Emscripte
 
 - One graphical canvas, `glutInit`, RGB/RGBA display modes, optional depth/stencil/alpha/multisample buffers.
 - Display, reshape, idle, timer, keyboard, special-key, key-up, mouse, motion and passive-motion callbacks.
-- `glutPostRedisplay`, `glutMainLoop`, `glutLeaveMainLoop`, `glutGetModifiers`, a documented subset of `glutGet`, and solid/wire cubes.
+- `glutPostRedisplay`, `glutMainLoop`, `glutLeaveMainLoop`, `glutGetModifiers`, a documented subset of `glutGet`, and solid/wire cubes, spheres, cones and tori.
 - Immediate-mode OpenGL calls, matrix transforms and GLU operations are supplied by the pinned Emscripten SDK, not implemented by the adapter. Only exercised fixtures should be considered verified.
 - ASCII/Latin-1 keyboard characters and standard GLUT special keys. Text composition and arbitrary Unicode character callbacks are outside this profile.
 - Line-oriented UTF-8 standard input for `std::cin`, `std::getline`, `scanf` and related libc reads. Prompts without newlines flush before input is requested. Enter submits a line; EOF closes the stream until the next run.
 - An unused `#include <windows.h>` is accepted by a documented compatibility header. It declares no Win32 system APIs; code that actually calls them still receives errors.
+- Current color and normal state is applied at each vertex, including when a color is set once for a whole face inside `glBegin`/`glEnd`. This repairs the pinned SDK's interleaved-attribute stride assertion for classroom code.
+- Convex `GL_POLYGON` input maps to a triangle fan. Concave polygons require explicit triangulation.
 - `glVertex2d` converts to the existing floating-point vertex path. Browser rendering retains the precision limits of that path.
 
 All C++ execution and callbacks run inside a dedicated worker. A tight loop can be terminated by discarding that worker. Workers do not impose a hard GPU-memory/driver isolation guarantee; the browser and GPU remain shared resources.
@@ -29,15 +31,23 @@ All C++ execution and callbacks run inside a dedicated worker. A tight loop can 
 
 ## Unsupported
 
-Multiple windows/subwindows, native menus, application-requested fullscreen/positioning, game modes, stereo/indexed/accumulation display modes, GLUT fonts, sphere/teapot helpers, native extensions and arbitrary external libraries are outside the initial profile. Use the IDE's fullscreen control. Unsupported GLUT declarations either produce a specific compile-time error or are absent from the restricted header. The adapter removes all stock GLUT symbols before installing its own functions; remaining stock names become explicit unsupported errors.
+Multiple windows/subwindows, native menus, application-requested fullscreen/positioning, game modes, stereo/indexed/accumulation display modes, GLUT fonts, teapot helpers, native extensions and arbitrary external libraries are outside the initial profile. Use the IDE's fullscreen control. Unsupported GLUT declarations either produce a specific compile-time error or are absent from the restricted header. The adapter removes all stock GLUT symbols before installing its own functions; remaining stock names become explicit unsupported errors.
 
 The current profile is for callback-driven graphics assignments. Its stdin row feeds the running program; it is not a shell or a complete PTY with raw terminal control. A native debugger is outside the profile. Compilation success alone does not prove graphics compatibility.
 
 Input uses Asyncify and a bounded `fd_read` bridge, keeping the worker event loop and heartbeat responsive while C++ waits. Each input request has an identifier scoped to its execution channel, and stale/duplicate replies are rejected. Input is limited to 8192 characters per submitted line. GLUT callbacks are held while a Wasm input operation is suspended to prevent reentry into the suspended stack. Stop destroys the worker and its pending read; Restart begins with no retained input.
 
+## Classroom examples
+
+The Examples menu includes the 13 supplied lab files plus Rectangle and pentagon. The original file sources are retained in `src/classroom-examples.json`; the pasted example has chat escaping removed. `tests/browser/classroom.spec.ts` compiles every program and checks rendered pixels, day/night keys, automatic timers, rotation, movement and stop/resume input.
+
+Sphere, cone and torus helpers generate vertices and unit normals inside the worker. Tessellation is capped at 256 segments per dimension. Invalid or negative dimensions produce no geometry. Lighting and materials use the pinned SDK emulation. `glPolygonMode` remains an SDK no-op; the transformation example draws its outline explicitly with `glutWireCube`.
+
+Some supplied programs call `glutInitWindowSize` after creating their window. As in GLUT, that sets the preferred size for a future window; the existing canvas retains the default 640 × 480. Move the call before `glutCreateWindow` to request a square canvas. The supplied lighting program declares only three diffuse-light components, although OpenGL expects four; use `{0, 1, 0, 1}` when editing that example for portable native execution.
+
 ## Toolchain coupling and evidence
 
-The adapter uses Emscripten's internal `GL.createContext`, `GL.makeContextCurrent` and `Browser.moduleContextCreatedCallbacks` to initialize legacy rendering without DOM-dependent GLUT code. Emscripten 6.0.13 requires automatic library loading for the WebGL-before-emulation initialization order; the custom library explicitly replaces the stock GLUT surface. Toolchain updates must run the triangle and interaction fixtures plus the infinite-loop termination check before adoption.
+The adapter uses Emscripten's internal `GL.createContext`, `GL.makeContextCurrent` and `Browser.moduleContextCreatedCallbacks` to initialize legacy rendering without DOM-dependent GLUT code. Emscripten 6.0.13 requires automatic library loading for the WebGL-before-emulation initialization order; the custom library explicitly replaces the stock GLUT surface. The adapter also defers the SDK matrix-library assignment until library objects are initialized, avoiding the GLImmediate/GLEmulation dependency cycle when compiling GLUT shape helpers. Toolchain updates must run the triangle and interaction fixtures plus the infinite-loop termination check before adoption.
 
 Primary references inspected during implementation:
 

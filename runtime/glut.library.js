@@ -9,6 +9,38 @@ for (var key of Object.keys(LibraryManager.library)) {
   if (/^glut[A-Z]/.test(key)) delete LibraryManager.library[key];
 }
 addToLibrary({
+  // The SDK's GLImmediate/GLEmulation dependency cycle can emit matrixLib's
+  // assignment before GLImmediate exists when a program uses GLUT helpers.
+  // Postsets run after the library objects have been initialized.
+  $GLImmediateSetup__deps: ['$GLImmediate'],
+  $GLImmediateSetup__postset: LibraryManager.library.$GLImmediateSetup__deps[1](),
+  // The SDK streams color/normal calls as vertex fields, so a single color for
+  // a whole face gives a malformed stride. Keep OpenGL's current attributes
+  // and emit exactly one of each for every vertex instead.
+  $GLStudioRawColor: LibraryManager.library.glColor4f,
+  $GLStudioRawNormal: LibraryManager.library.glNormal3f,
+  $GLStudioRawVertex: LibraryManager.library.glVertex4f,
+  $GLStudioRawBegin: LibraryManager.library.glBegin,
+  glBegin__deps: ['$GLImmediateSetup', '$GLStudioRawBegin'],
+  // Classroom polygons are convex; WebGL's triangle fan represents them.
+  glBegin: (mode) => GLStudioRawBegin(mode === 0x0009 ? 0x0006 : mode),
+  $GLStudioAttributes: { normal: [0, 0, 1] },
+  $GLStudioEmitVertex__deps: ['$GLImmediate', '$GLStudioAttributes', '$GLStudioRawColor', '$GLStudioRawNormal', '$GLStudioRawVertex'],
+  $GLStudioEmitVertex: (x, y, z, w) => {
+    GLStudioRawColor(...GLImmediate.clientColor);
+    GLStudioRawNormal(...GLStudioAttributes.normal);
+    GLStudioRawVertex(x, y, z, w);
+  },
+  glColor4f__deps: ['$GLImmediate'],
+  glColor4f: (r, g, b, a) => { GLImmediate.clientColor.set([r, g, b, a].map(v => Math.max(0, Math.min(1, v)))); },
+  glNormal3f__deps: ['$GLStudioAttributes'],
+  glNormal3f: (x, y, z) => { GLStudioAttributes.normal = [x, y, z]; },
+  glVertex2f__deps: ['$GLStudioEmitVertex'],
+  glVertex2f: (x, y) => GLStudioEmitVertex(x, y, 0, 1),
+  glVertex3f__deps: ['$GLStudioEmitVertex'],
+  glVertex3f: (x, y, z) => GLStudioEmitVertex(x, y, z, 1),
+  glVertex4f__deps: ['$GLStudioEmitVertex'],
+  glVertex4f: (x, y, z, w) => GLStudioEmitVertex(x, y, z, w),
   $GLStudio__deps: ['$GL', '$Browser', '$getWasmTableEntry', '$UTF8ToString', '$Asyncify'],
   // Keep the resize entry point for open IDE tabs that still send pane sizes.
   $GLStudio__postset: `Module['glstudio'] = {
@@ -274,6 +306,53 @@ addToLibrary({
     GLStudio.active = false;
     GLStudio.emit({type: 'status', status: 'stopped', message: 'Program left the GLUT event loop.'});
   },
+  // Parametric meshes stay inside the worker and provide normals for lighting.
+  $GLStudioSurface__deps: ['glBegin', 'glEnd', 'glNormal3f', 'glVertex3f'],
+  $GLStudioSurface: (kind, a, b, slices, stacks, wire) => {
+    if (![a, b, slices, stacks].every(Number.isFinite) || a < 0 || b < 0 || slices < 3 || stacks < 1) return;
+    slices = Math.min(256, Math.floor(slices));
+    stacks = Math.min(256, Math.floor(stacks));
+    var point = (i, j) => {
+      var u = i / slices * Math.PI * 2, v = j / stacks;
+      var c = Math.cos(u), s = Math.sin(u);
+      if (kind === 'sphere') {
+        var latitude = v * Math.PI, r = Math.sin(latitude), z = Math.cos(latitude);
+        return [[a*r*c, a*r*s, a*z], [r*c, r*s, z]];
+      }
+      if (kind === 'torus') {
+        var t = v * Math.PI * 2, ct = Math.cos(t), st = Math.sin(t);
+        return [[(b+a*ct)*c, (b+a*ct)*s, a*st], [ct*c, ct*s, st]];
+      }
+      var length = Math.hypot(a, b) || 1;
+      return [[a*(1-v)*c, a*(1-v)*s, b*v], [b*c/length, b*s/length, a/length]];
+    };
+    var emit = (p) => { _glNormal3f(...p[1]); _glVertex3f(...p[0]); };
+    _glBegin(wire ? 0x0001 : 0x0004);
+    for (var j = 0; j < stacks; j++) for (var i = 0; i < slices; i++) {
+      var p = point(i,j), q = point(i+1,j), r = point(i+1,j+1), t = point(i,j+1);
+      // Sphere latitude runs north to south, reversing the surface winding.
+      var vertices = wire ? [p,q,p,t] : kind === 'sphere' ? [p,t,q,q,t,r] : [p,q,t,q,r,t];
+      vertices.forEach(emit);
+    }
+    if (kind === 'cone') for (var i = 0; i < slices; i++) {
+      var p = point(i,0), q = point(i+1,0);
+      p[1] = q[1] = [0,0,-1];
+      (wire ? [p,q] : [[[0,0,0],[0,0,-1]],q,p]).forEach(emit);
+    }
+    _glEnd();
+  },
+  glutSolidSphere__deps: ['$GLStudioSurface'],
+  glutSolidSphere: (radius, slices, stacks) => GLStudioSurface('sphere', radius, 0, slices, stacks, false),
+  glutWireSphere__deps: ['$GLStudioSurface'],
+  glutWireSphere: (radius, slices, stacks) => GLStudioSurface('sphere', radius, 0, slices, stacks, true),
+  glutSolidCone__deps: ['$GLStudioSurface'],
+  glutSolidCone: (base, height, slices, stacks) => GLStudioSurface('cone', base, height, slices, stacks, false),
+  glutWireCone__deps: ['$GLStudioSurface'],
+  glutWireCone: (base, height, slices, stacks) => GLStudioSurface('cone', base, height, slices, stacks, true),
+  glutSolidTorus__deps: ['$GLStudioSurface'],
+  glutSolidTorus: (inner, outer, sides, rings) => GLStudioSurface('torus', inner, outer, rings, sides, false),
+  glutWireTorus__deps: ['$GLStudioSurface'],
+  glutWireTorus: (inner, outer, sides, rings) => GLStudioSurface('torus', inner, outer, rings, sides, true),
   glutSolidCube__deps: ['glBegin', 'glEnd', 'glNormal3f', 'glVertex3f'],
   glutSolidCube: (size) => {
     var h = size / 2;

@@ -1,3 +1,4 @@
+import classroomExamples from './classroom-examples.json' with { type: 'json' };
 import type { SourceFile } from '../shared/contracts';
 
 export interface Example { id: string; name: string; description: string; files: SourceFile[] }
@@ -158,4 +159,5 @@ export const examples: Example[] = [
     { id: 'triangle', name: 'Colored triangle', description: 'Interpolate colors between three vertices.', files: [{ path: 'main.cpp', content: triangle }] },
     { id: 'dda', name: 'DDA line drawing', description: 'Plot line segments one point at a time.', files: [{ path: 'main.cpp', content: dda }] },
     { id: 'animation', name: 'Rotating triangle', description: 'Press Space to pause or resume rotation.', files: [{ path: 'main.cpp', content: animation }] },
+    ...classroomExamples,
 ];
